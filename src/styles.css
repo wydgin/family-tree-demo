@@ -1,0 +1,118 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.flow-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+.react-flow {
+  background: #121318;
+}
+
+.react-flow__controls {
+  border: 1px solid #2e3038;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.react-flow__controls-button {
+  background: #1b1b1f;
+  border-bottom-color: #2e3038;
+  fill: #c7c5d0;
+}
+
+.react-flow__controls-button:hover {
+  background: #2e3038;
+}
+
+.react-flow__minimap {
+  border: 1px solid #2e3038;
+  border-radius: 10px;
+  background: #1b1b1f;
+}
+
+/* Person nodes — SaasAble paper tones */
+.person-node {
+  min-width: 7.5rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid #43455f;
+  background: #1b1b1f;
+  text-align: center;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+}
+
+.person-node--highlighted {
+  border-color: #606bdf;
+  box-shadow:
+    0 0 0 1px rgb(96 107 223 / 35%),
+    0 8px 24px rgb(0 0 0 / 35%);
+}
+
+.person-node__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #e4e1e6;
+  white-space: nowrap;
+}
+
+.person-handle,
+.connector-handle {
+  width: 6px;
+  height: 6px;
+  opacity: 0;
+  border: none;
+  background: transparent;
+}
+
+.connector-node {
+  position: relative;
+  width: 28px;
+  height: 28px;
+}
+
+.connector-node__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid #f472b6;
+  background: transparent;
+  box-shadow: 0 0 12px rgb(244 114 182 / 25%);
+}
+
+.connector-node--branch .connector-node__ring {
+  width: 22px;
+  height: 22px;
+  margin: 3px;
+  border-width: 2.5px;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke: #f472b6;
+  stroke-width: 3.5;
+  stroke-dasharray: 10 7;
+  animation: family-tree-dash 0.55s linear infinite;
+}
+
+.react-flow__edge:not(.animated) .react-flow__edge-path {
+  stroke-width: 2.5;
+}
+
+@keyframes family-tree-dash {
+  to {
+    stroke-dashoffset: -17;
+  }
+}
