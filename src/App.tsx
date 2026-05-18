@@ -1,26 +1,15 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
-import LockIcon from '@mui/icons-material/Lock';
-import LockOpenIcon from '@mui/icons-material/LockOpen';
-import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import CssBaseline from '@mui/material/CssBaseline';
-import Stack from '@mui/material/Stack';
 import { ThemeProvider } from '@mui/material/styles';
-import IconButton from '@mui/material/IconButton';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import Toolbar from '@mui/material/Toolbar';
-import Tooltip from '@mui/material/Tooltip';
-import Typography from '@mui/material/Typography';
 import '@fontsource/figtree/400.css';
 import '@fontsource/figtree/500.css';
 import '@fontsource/figtree/600.css';
 
+import { AppHeader } from './components/AppHeader';
 import { initialEdges, initialNodes } from './data/familyTree';
 import { strictEdges, strictNodes } from './data/strictFamilyTree';
 import { FamilyTreeFlow } from './flow/FamilyTreeFlow';
@@ -29,7 +18,6 @@ import type { LayoutMode } from './layouts/positions';
 import { COLOR_MODE_STORAGE_KEY } from './theme/applyThemeTokens';
 import { ColorModeProvider } from './theme/ColorModeProvider';
 import { saasableTheme } from './theme/saasableTheme';
-import { ThemeModeToggle } from './theme/ThemeModeToggle';
 
 const FamilyTreeSpatial = lazy(() =>
   import('./spatial/FamilyTreeSpatial').then((m) => ({
@@ -41,12 +29,9 @@ function AppShell() {
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('web');
   const [nodesLocked, setNodesLocked] = useState(() => loadLockState());
 
-  const onLayoutChange = useCallback(
-    (_: React.MouseEvent<HTMLElement>, value: LayoutMode | null) => {
-      if (value) setLayoutMode(value);
-    },
-    [],
-  );
+  const onLayoutChange = useCallback((value: LayoutMode) => {
+    setLayoutMode(value);
+  }, []);
 
   const toggleNodesLocked = useCallback(() => {
     setNodesLocked((prev) => {
@@ -62,53 +47,12 @@ function AppShell() {
     <>
       <CssBaseline enableColorScheme />
       <Box className="app">
-        <AppBar position="static" elevation={0} sx={{ zIndex: 1200, flexShrink: 0 }}>
-          <Toolbar sx={{ gap: 2, flexWrap: 'wrap', py: 1 }}>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ flex: 1, minWidth: 200 }}>
-              <AccountTreeOutlinedIcon color="primary" />
-              <Box>
-                <Typography variant="h6" component="h1" color="text.primary">
-                  Family Tree
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {layoutMode === 'strict'
-                    ? 'Generational rows · step edges · click for immediate family'
-                    : layoutMode === 'web'
-                      ? 'Flower layout · radial ring per family hub'
-                      : 'Drag to orbit · scroll to zoom'}
-                </Typography>
-              </Box>
-            </Stack>
-            <ThemeModeToggle />
-            {layoutMode === 'web' && (
-              <Tooltip title={nodesLocked ? 'Unlock nodes (allow drag)' : 'Lock nodes'}>
-                <IconButton
-                  size="small"
-                  color={nodesLocked ? 'primary' : 'default'}
-                  onClick={toggleNodesLocked}
-                  aria-label={nodesLocked ? 'Unlock nodes' : 'Lock nodes'}
-                  aria-pressed={nodesLocked}
-                >
-                  {nodesLocked ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
-                </IconButton>
-              </Tooltip>
-            )}
-            <ToggleButtonGroup
-              exclusive
-              size="small"
-              value={layoutMode}
-              onChange={onLayoutChange}
-              aria-label="Layout mode"
-            >
-              <ToggleButton value="strict">Strict</ToggleButton>
-              <ToggleButton value="web">Web</ToggleButton>
-              <ToggleButton value="spatial">Spatial</ToggleButton>
-            </ToggleButtonGroup>
-            {layoutMode === 'spatial' && (
-              <Chip size="small" label="Drag to orbit · scroll to zoom" variant="outlined" />
-            )}
-          </Toolbar>
-        </AppBar>
+        <AppHeader
+          layoutMode={layoutMode}
+          onLayoutChange={onLayoutChange}
+          nodesLocked={nodesLocked}
+          onToggleLock={toggleNodesLocked}
+        />
         <Box className="flow-panel">
           {layoutMode === 'spatial' ? (
             <Box sx={{ width: '100%', height: '100%' }}>

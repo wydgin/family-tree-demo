@@ -64,19 +64,43 @@ function addMarriedChild(
 ) {
   hubIds.add(mc.hubId);
   registerPerson(mc.sibling);
-  registerPerson(mc.spouse);
 
-  if (layout === 'hub-spouse-out') {
-    addBranchEdge(mc.sibling.id, mc.hubId, `${mc.sibling.id}-${mc.hubId}`);
-    addBranchEdge(mc.hubId, mc.spouse.id, `${mc.hubId}-${mc.spouse.id}`);
+  if (mc.spouse) {
+    registerPerson(mc.spouse);
+    if (layout === 'hub-spouse-out') {
+      addBranchEdge(mc.sibling.id, mc.hubId, `${mc.sibling.id}-${mc.hubId}`);
+      addBranchEdge(mc.hubId, mc.spouse.id, `${mc.hubId}-${mc.spouse.id}`);
+    } else {
+      addBranchEdge(mc.sibling.id, mc.hubId, `${mc.sibling.id}-${mc.hubId}`);
+      addBranchEdge(mc.spouse.id, mc.hubId, `${mc.spouse.id}-${mc.hubId}`);
+    }
   } else {
     addBranchEdge(mc.sibling.id, mc.hubId, `${mc.sibling.id}-${mc.hubId}`);
-    addBranchEdge(mc.spouse.id, mc.hubId, `${mc.spouse.id}-${mc.hubId}`);
   }
 
   if (mc.exSpouse) {
     registerPerson(mc.exSpouse);
     addFaintEdge(mc.exSpouse.id, mc.sibling.id);
+  }
+
+  for (const cousin of mc.children ?? []) {
+    registerPerson(cousin);
+    addGreyEdge(mc.hubId, cousin.id, `${mc.hubId}-${cousin.id}`);
+  }
+
+  for (const group of mc.childrenByCoParent ?? []) {
+    const anchor =
+      mc.spouse && group.withCoParentId === mc.spouse.id
+        ? mc.hubId
+        : group.withCoParentId;
+    for (const cousin of group.children) {
+      registerPerson(cousin);
+      addGreyEdge(anchor, cousin.id, `${anchor}-${cousin.id}`);
+    }
+  }
+
+  for (const nested of mc.marriedChildren ?? []) {
+    addMarriedChild(nested, 'hub-spouse-out');
   }
 }
 
@@ -139,7 +163,12 @@ function buildFlowNodes(): FlowNode[] {
 
   for (const hubId of hubIds) {
     const variant =
-      hubId === 'hub-brother-2' || hubId.startsWith('hub-auntie') ? 'branch' : 'primary';
+      hubId === 'hub-brother-2' ||
+      hubId.startsWith('hub-auntie') ||
+      hubId.startsWith('hub-uncle') ||
+      hubId.startsWith('hub-cousin')
+        ? 'branch'
+        : 'primary';
     nodes.push({
       id: hubId,
       type: 'connector',
