@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -8,8 +8,10 @@ import {
   ReactFlow,
   useEdgesState,
   useNodesState,
+  useReactFlow,
   type Edge,
   type Node,
+  type NodeChange,
 } from '@xyflow/react';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -17,6 +19,12 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { dimmedEdgeStyle, focusEdgeStyle } from '../data/edgeStyles';
 import { FloatingFamilyEdge } from '../edges/FloatingFamilyEdge';
 import { useFlowerLayout } from '../layouts/useFlowerLayout';
+import {
+  loadSavedPositions,
+  mergeSavedPositions,
+  saveNodePositions,
+  WEB_POSITIONS_KEY,
+} from './nodePositionStorage';
 import { RefreshNodeInternals } from './RefreshNodeInternals';
 import type { ConnectorNodeData } from '../nodes/ConnectorNode';
 import { ConnectorNode } from '../nodes/ConnectorNode';
@@ -50,6 +58,8 @@ export type FamilyTreeFlowProps = {
   edgeType?: FlowEdgeType;
   /** ELK radial ring on each connector hub, branching outward per family. */
   flowerLayout?: boolean;
+  /** localStorage key for remembering dragged node positions */
+  positionsStorageKey?: string;
 };
 
 function withThemedBranchEdges(edges: Edge[], branchColor: string): Edge[] {
@@ -127,16 +137,27 @@ function FlowerLayoutRunner({
   initialNodes,
   initialEdges,
   fitPadding,
+  positionsStorageKey,
+  setNodes,
+  setEdges,
 }: {
   initialNodes: TreeNode[];
   initialEdges: Edge[];
   fitPadding: number;
+  positionsStorageKey?: string;
+  setNodes: ReturnType<typeof useNodesState<TreeNode>>[1];
+  setEdges: ReturnType<typeof useEdgesState>[1];
 }) {
+  const { fitView } = useReactFlow();
   const { ready, error, revision } = useFlowerLayout(
     initialNodes,
     initialEdges,
     true,
+    setNodes,
+    setEdges,
+    fitView,
     fitPadding,
+    positionsStorageKey,
   );
 
   if (error) {
@@ -158,6 +179,22 @@ function FlowerLayoutRunner({
   return <RefreshNodeInternals revision={revision} />;
 }
 
+function PersistNodePositions({ storageKey }: { storageKey: string }) {
+  const { getNodes } = useReactFlow();
+
+  const persist = useCallback(() => {
+    saveNodePositions(getNodes(), storageKey);
+  }, [getNodes, storageKey]);
+
+  useEffect(() => {
+    const onUp = () => persist();
+    window.addEventListener('pointerup', onUp);
+    return () => window.removeEventListener('pointerup', onUp);
+  }, [persist]);
+
+  return null;
+}
+
 export function FamilyTreeFlow({
   initialNodes,
   initialEdges,
@@ -166,12 +203,46 @@ export function FamilyTreeFlow({
   focusMode = 'immediate',
   edgeType = 'default',
   flowerLayout = false,
+  positionsStorageKey = WEB_POSITIONS_KEY,
 }: FamilyTreeFlowProps) {
   const { mode } = useAppColorMode();
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const savedPositions = useMemo(
+    () => (positionsStorageKey ? loadSavedPositions(positionsStorageKey) : null),
+    [positionsStorageKey],
+  );
+  const [nodes, setNodes, onNodesChange] = useNodesState(
+    mergeSavedPositions(initialNodes, savedPositions),
+  );
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const saveTimer = useRef<number | null>(null);
   const tokens = flowTheme[mode];
+
+  const handleNodesChange = useCallback(
+    (changes: NodeChange<TreeNode>[]) => {
+      onNodesChange(changes);
+      if (!positionsStorageKey || !nodesDraggable) return;
+      const moved = changes.some((c) => c.type === 'position' && c.dragging);
+      if (!moved) return;
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+      saveTimer.current = window.setTimeout(() => {
+        setNodes((current) => {
+          saveNodePositions(current, positionsStorageKey);
+          return current;
+        });
+      }, 400);
+    },
+    [onNodesChange, positionsStorageKey, nodesDraggable, setNodes],
+  );
+
+  const onNodeDragStop = useCallback(
+    (_event: React.MouseEvent, _node: Node, currentNodes: Node[]) => {
+      if (positionsStorageKey) {
+        saveNodePositions(currentNodes, positionsStorageKey);
+      }
+    },
+    [positionsStorageKey],
+  );
 
   const themedEdges = useMemo(
     () => withThemedBranchEdges(edges, tokens.branchStroke),
@@ -197,7 +268,8 @@ export function FamilyTreeFlow({
     <ReactFlow
       nodes={displayNodes}
       edges={displayEdges}
-      onNodesChange={onNodesChange}
+      onNodesChange={handleNodesChange}
+      onNodeDragStop={onNodeDragStop}
       onEdgesChange={onEdgesChange}
       onNodeClick={onNodeClick}
       onPaneClick={onPaneClick}
@@ -220,7 +292,13 @@ export function FamilyTreeFlow({
           initialNodes={initialNodes}
           initialEdges={initialEdges}
           fitPadding={fitPadding}
+          positionsStorageKey={positionsStorageKey}
+          setNodes={setNodes}
+          setEdges={setEdges}
         />
+      )}
+      {positionsStorageKey && nodesDraggable && (
+        <PersistNodePositions storageKey={positionsStorageKey} />
       )}
       <Background
         variant={BackgroundVariant.Dots}

@@ -12,6 +12,20 @@ const CONNECTOR = 28;
 const RING_PAD = 52;
 const SPOKE_GAP = 145;
 const COUPLE_BRANCH_OUT = 280;
+const COUPLE_BRANCH_OUT_PATERNAL = 320;
+const PATERNAL_SPOKE_EXTRA = 120;
+
+/** Same angular spread as webLayout — mirrors maternal ring on the right. */
+const PATERNAL_A_ANGLE: Record<string, number> = {
+  'grandmother-2': -Math.PI / 2 - 0.22,
+  'grandfather-2': -Math.PI / 2 + 0.22,
+  'tiyong-1': Math.PI * 1.05,
+  'tiyong-2': Math.PI * 0.68,
+  'tiyong-3': Math.PI * 0.54,
+  'tiyang-1': Math.PI * 0.4,
+  'tiyang-2': Math.PI * 0.26,
+  'tiyang-3': Math.PI * 0.12,
+};
 const SPOUSE_ALONG_SPOKE = 130;
 const COUPLE_BRANCH_CLOSE = 115;
 const EX_NEAR_SIBLING = 105;
@@ -45,6 +59,19 @@ class PositionMap {
     if (node.type === 'connector') {
       this.hubCenters.set(id, { cx, cy });
     }
+  }
+
+  clear(id: string) {
+    this.positions.delete(id);
+    this.hubCenters.delete(id);
+  }
+
+  swapPositions(idA: string, idB: string) {
+    const a = this.positions.get(idA);
+    const b = this.positions.get(idB);
+    if (!a || !b) return;
+    this.positions.set(idA, { ...b });
+    this.positions.set(idB, { ...a });
   }
 }
 
@@ -128,6 +155,34 @@ function polar(cx: number, cy: number, r: number, angle: number): Pos {
   return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
 }
 
+function maxPetalRadius(
+  hubId: string,
+  map: PositionMap,
+  graph: GraphMaps,
+): number {
+  const hub = map.hubCenters.get(hubId);
+  if (!hub) return ringRadius(9);
+  let max = 0;
+  for (const id of hubMembers(hubId, graph)) {
+    if (!map.has(id) || isConnector(id, graph.nodeById)) continue;
+    if (isCoupleHub(id)) continue;
+    const node = graph.nodeById.get(id)!;
+    const { cx, cy } = map.centerOf(id, node);
+    max = Math.max(max, Math.hypot(cx - hub.cx, cy - hub.cy));
+  }
+  return max > 0 ? max : ringRadius(9);
+}
+
+function angleForMember(
+  memberId: string,
+  index: number,
+  total: number,
+  preferred?: Record<string, number>,
+) {
+  if (preferred?.[memberId] !== undefined) return preferred[memberId]!;
+  return -Math.PI / 2 + ((2 * Math.PI) / total) * index;
+}
+
 type CoupleMode = 'outward' | 'close';
 
 export async function layoutFlowerTree<T extends Node>(
@@ -143,8 +198,10 @@ export async function layoutFlowerTree<T extends Node>(
     siblingId: string,
     parentHubId: string,
     mode: CoupleMode,
+    force = false,
+    branchOutDist = COUPLE_BRANCH_OUT,
   ) {
-    if (map.hubCenters.has(hubId)) return;
+    if (map.hubCenters.has(hubId) && !force) return;
 
     const sib = graph.nodeById.get(siblingId);
     const parentHub = map.hubCenters.get(parentHubId);
@@ -152,7 +209,7 @@ export async function layoutFlowerTree<T extends Node>(
 
     const { cx: scx, cy: scy } = map.centerOf(siblingId, sib);
     const spoke = Math.atan2(scy - parentHub.cy, scx - parentHub.cx);
-    const branchDist = mode === 'outward' ? COUPLE_BRANCH_OUT : COUPLE_BRANCH_CLOSE;
+    const branchDist = mode === 'outward' ? branchOutDist : COUPLE_BRANCH_CLOSE;
     const hubPos = polar(scx, scy, branchDist, spoke);
 
     map.setCenter(hubId, hubPos.x, hubPos.y, graph.nodeById.get(hubId)!);
@@ -179,13 +236,49 @@ export async function layoutFlowerTree<T extends Node>(
     siblingId: string,
     mode: CoupleMode,
   ) {
+    const branchOut =
+      parentHubId === 'hub-gp-paternal-a' || parentHubId === 'hub-gp-paternal-b'
+        ? COUPLE_BRANCH_OUT_PATERNAL
+        : COUPLE_BRANCH_OUT;
     for (const hubId of graph.personToHub.get(siblingId) ?? []) {
       if (!isCoupleHub(hubId)) continue;
-      layoutCoupleHub(hubId, siblingId, parentHubId, mode);
+      layoutCoupleHub(hubId, siblingId, parentHubId, mode, false, branchOut);
     }
   }
 
-  async function layoutFlower(hubId: string, cx: number, cy: number, coupleMode: CoupleMode) {
+  function layoutFlowerPolar(
+    hubId: string,
+    cx: number,
+    cy: number,
+    coupleMode: CoupleMode,
+    preferredAngles: Record<string, number>,
+    ringR: number,
+  ) {
+    map.setCenter(hubId, cx, cy, graph.nodeById.get(hubId)!);
+
+    const toPlace = hubMembers(hubId, graph).filter(
+      (id) => !anchored.has(id) && !(isConnector(id, graph.nodeById) && isCoupleHub(id)),
+    );
+    const n = toPlace.length;
+
+    toPlace.forEach((memberId, i) => {
+      const angle = angleForMember(memberId, i, n, preferredAngles);
+      const p = polar(cx, cy, ringR, angle);
+      map.setCenter(memberId, p.x, p.y, graph.nodeById.get(memberId)!);
+
+      if (!isConnector(memberId, graph.nodeById)) {
+        layoutCouplesForSibling(hubId, memberId, coupleMode);
+      }
+    });
+  }
+
+  async function layoutFlower(
+    hubId: string,
+    cx: number,
+    cy: number,
+    coupleMode: CoupleMode,
+    spreadRing = false,
+  ) {
     map.setCenter(hubId, cx, cy, graph.nodeById.get(hubId)!);
 
     const toPlace = hubMembers(hubId, graph).filter(
@@ -198,6 +291,7 @@ export async function layoutFlowerTree<T extends Node>(
       cy,
       toPlace,
       graph.nodeById,
+      spreadRing,
     );
 
     for (const memberId of toPlace) {
@@ -215,6 +309,7 @@ export async function layoutFlowerTree<T extends Node>(
     childHubId: string,
     parentHubId: string,
     viaPersonId: string,
+    extraDist = 0,
   ) {
     const parentHub = map.hubCenters.get(parentHubId);
     const person = graph.nodeById.get(viaPersonId);
@@ -224,8 +319,15 @@ export async function layoutFlowerTree<T extends Node>(
     const spoke = Math.atan2(pcy - parentHub.cy, pcx - parentHub.cx);
     const parentN = hubMembers(parentHubId, graph).length;
     const childN = hubMembers(childHubId, graph).filter((id) => !anchored.has(id)).length;
-    const dist = spokeDistance(parentN, childN);
+    const dist = spokeDistance(parentN, childN) + extraDist;
     return polar(parentHub.cx, parentHub.cy, dist, spoke);
+  }
+
+  function relayoutPaternalCouples() {
+    for (const id of hubMembers('hub-gp-paternal-a', graph)) {
+      if (isConnector(id, graph.nodeById)) continue;
+      layoutCouplesForSibling('hub-gp-paternal-a', id, 'outward');
+    }
   }
 
   await layoutFlower('hub-gp-maternal', 380, 520, 'outward');
@@ -233,10 +335,50 @@ export async function layoutFlowerTree<T extends Node>(
 
   const parentsCenter = placeChildHubOnSpoke('hub-parents', 'hub-gp-maternal', 'mother');
   if (parentsCenter) await layoutFlower('hub-parents', parentsCenter.x, parentsCenter.y, 'close');
-  anchored.add('father');
 
-  const paternalCenter = placeChildHubOnSpoke('hub-gp-paternal-a', 'hub-parents', 'father');
-  if (paternalCenter) await layoutFlower('hub-gp-paternal-a', paternalCenter.x, paternalCenter.y, 'outward');
+  const maternalRingR = maxPetalRadius('hub-gp-maternal', map, graph);
+
+  const paternalCenter = placeChildHubOnSpoke(
+    'hub-gp-paternal-a',
+    'hub-parents',
+    'father',
+    PATERNAL_SPOKE_EXTRA,
+  );
+  if (paternalCenter) {
+    const parentsHub = map.hubCenters.get('hub-parents');
+    const fatherAngle = parentsHub
+      ? Math.atan2(
+          parentsHub.cy - paternalCenter.y,
+          parentsHub.cx - paternalCenter.x,
+        )
+      : -0.12;
+
+    layoutFlowerPolar(
+      'hub-gp-paternal-a',
+      paternalCenter.x,
+      paternalCenter.y,
+      'outward',
+      { ...PATERNAL_A_ANGLE, father: fatherAngle },
+      maternalRingR,
+    );
+
+    // Tiyong 2 has no spouse — swap ring spots with Tiyang 2 (+ her husband hub)
+    map.swapPositions('tiyong-2', 'tiyang-2');
+    for (const id of ['hub-tiyang-2', 'tiyang-2-husband']) {
+      map.clear(id);
+    }
+    layoutCoupleHub(
+      'hub-tiyang-2',
+      'tiyang-2',
+      'hub-gp-paternal-a',
+      'outward',
+      true,
+      COUPLE_BRANCH_OUT_PATERNAL,
+    );
+    relayoutPaternalCouples();
+  }
+
+  anchored.add('father');
   anchored.add('grandmother-2');
 
   const paternalA = map.hubCenters.get('hub-gp-paternal-a');
@@ -245,7 +387,7 @@ export async function layoutFlowerTree<T extends Node>(
     const spoke = Math.atan2(gy - paternalA.cy, gx - paternalA.cx);
     const dist = spokeDistance(hubMembers('hub-gp-paternal-a', graph).length, 2) + 70;
     const center = polar(paternalA.cx, paternalA.cy, dist, spoke + 0.4);
-    await layoutFlower('hub-gp-paternal-b', center.x, center.y, 'outward');
+    await layoutFlower('hub-gp-paternal-b', center.x, center.y, 'outward', true);
   }
 
   return nodes.map((node) => {

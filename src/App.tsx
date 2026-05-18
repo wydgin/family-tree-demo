@@ -2,6 +2,8 @@ import { lazy, Suspense, useCallback, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
+import LockIcon from '@mui/icons-material/Lock';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -9,9 +11,11 @@ import CircularProgress from '@mui/material/CircularProgress';
 import CssBaseline from '@mui/material/CssBaseline';
 import Stack from '@mui/material/Stack';
 import { ThemeProvider } from '@mui/material/styles';
+import IconButton from '@mui/material/IconButton';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Toolbar from '@mui/material/Toolbar';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import '@fontsource/figtree/400.css';
 import '@fontsource/figtree/500.css';
@@ -20,6 +24,7 @@ import '@fontsource/figtree/600.css';
 import { initialEdges, initialNodes } from './data/familyTree';
 import { strictEdges, strictNodes } from './data/strictFamilyTree';
 import { FamilyTreeFlow } from './flow/FamilyTreeFlow';
+import { loadLockState, saveLockState } from './flow/nodePositionStorage';
 import type { LayoutMode } from './layouts/positions';
 import { COLOR_MODE_STORAGE_KEY } from './theme/applyThemeTokens';
 import { ColorModeProvider } from './theme/ColorModeProvider';
@@ -34,6 +39,7 @@ const FamilyTreeSpatial = lazy(() =>
 
 function AppShell() {
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('web');
+  const [nodesLocked, setNodesLocked] = useState(() => loadLockState());
 
   const onLayoutChange = useCallback(
     (_: React.MouseEvent<HTMLElement>, value: LayoutMode | null) => {
@@ -41,6 +47,14 @@ function AppShell() {
     },
     [],
   );
+
+  const toggleNodesLocked = useCallback(() => {
+    setNodesLocked((prev) => {
+      const next = !prev;
+      saveLockState(next);
+      return next;
+    });
+  }, []);
 
   const flowKey = layoutMode === 'web' ? 'web' : 'strict';
 
@@ -66,6 +80,19 @@ function AppShell() {
               </Box>
             </Stack>
             <ThemeModeToggle />
+            {layoutMode === 'web' && (
+              <Tooltip title={nodesLocked ? 'Unlock nodes (allow drag)' : 'Lock nodes'}>
+                <IconButton
+                  size="small"
+                  color={nodesLocked ? 'primary' : 'default'}
+                  onClick={toggleNodesLocked}
+                  aria-label={nodesLocked ? 'Unlock nodes' : 'Lock nodes'}
+                  aria-pressed={nodesLocked}
+                >
+                  {nodesLocked ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            )}
             <ToggleButtonGroup
               exclusive
               size="small"
@@ -109,7 +136,7 @@ function AppShell() {
                 <FamilyTreeFlow
                   initialNodes={layoutMode === 'strict' ? strictNodes : initialNodes}
                   initialEdges={layoutMode === 'strict' ? strictEdges : initialEdges}
-                  nodesDraggable={layoutMode === 'web'}
+                  nodesDraggable={layoutMode === 'web' && !nodesLocked}
                   fitPadding={layoutMode === 'strict' ? 0.08 : 0.22}
                   focusMode="immediate"
                   edgeType={layoutMode === 'strict' ? 'step' : 'default'}

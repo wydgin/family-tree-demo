@@ -18,6 +18,11 @@ const HUB_RADIAL_OPTIONS = {
   'elk.radial.compactor': 'NONE',
 };
 
+const HUB_RADIAL_SPREAD_OPTIONS = {
+  ...HUB_RADIAL_OPTIONS,
+  'elk.spacing.nodeNode': '92',
+};
+
 type ElkLaid = { id?: string; x?: number; y?: number; width?: number; height?: number };
 
 /** ELK radial on one connector hub + its immediate family (the “petals”). */
@@ -27,6 +32,7 @@ export async function layoutHubRadialCluster(
   centerY: number,
   memberIds: string[],
   nodeById: Map<string, Node>,
+  spread = false,
 ): Promise<Map<string, { x: number; y: number }>> {
   const out = new Map<string, { x: number; y: number }>();
   if (memberIds.length === 0) return out;
@@ -58,7 +64,7 @@ export async function layoutHubRadialCluster(
 
   const laid = await elk.layout({
     id: `flower-${hubId}`,
-    layoutOptions: HUB_RADIAL_OPTIONS,
+    layoutOptions: spread ? HUB_RADIAL_SPREAD_OPTIONS : HUB_RADIAL_OPTIONS,
     children: children as { id: string; width: number; height: number }[],
     edges: elkEdges,
   });
@@ -80,7 +86,8 @@ export async function layoutHubRadialCluster(
   }
 
   if (out.size < memberIds.length) {
-    const r = Math.max(200, (PERSON_W + 36) / (2 * Math.sin(Math.PI / n)));
+    const base = spread ? 248 : 200;
+    const r = Math.max(base, (PERSON_W + (spread ? 56 : 36)) / (2 * Math.sin(Math.PI / n)));
     memberIds.forEach((id, i) => {
       const angle = -Math.PI / 2 + ((2 * Math.PI) / n) * i;
       out.set(id, {
