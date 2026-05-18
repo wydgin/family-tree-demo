@@ -1,19 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
-import {
-  Background,
-  BackgroundVariant,
-  Controls,
-  MiniMap,
-  ReactFlow,
-  ReactFlowProvider,
-  useReactFlow,
-  useEdgesState,
-  useNodesState,
-} from '@xyflow/react';
+import { lazy, Suspense, useCallback, useState } from 'react';
+import { ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
 import CssBaseline from '@mui/material/CssBaseline';
 import Stack from '@mui/material/Stack';
 import { ThemeProvider } from '@mui/material/styles';
@@ -26,64 +18,21 @@ import '@fontsource/figtree/500.css';
 import '@fontsource/figtree/600.css';
 
 import { initialEdges, initialNodes } from './data/familyTree';
-import { layoutPositions, type LayoutMode } from './layouts/positions';
-import { ConnectorNode } from './nodes/ConnectorNode';
-import { PersonNode } from './nodes/PersonNode';
+import { strictEdges, strictNodes } from './data/strictFamilyTree';
+import { FamilyTreeFlow } from './flow/FamilyTreeFlow';
+import type { LayoutMode } from './layouts/positions';
+import { COLOR_MODE_STORAGE_KEY } from './theme/applyThemeTokens';
+import { ColorModeProvider } from './theme/ColorModeProvider';
 import { saasableTheme } from './theme/saasableTheme';
+import { ThemeModeToggle } from './theme/ThemeModeToggle';
 
-const nodeTypes = {
-  person: PersonNode,
-  connector: ConnectorNode,
-};
+const FamilyTreeSpatial = lazy(() =>
+  import('./spatial/FamilyTreeSpatial').then((m) => ({
+    default: m.FamilyTreeSpatial,
+  })),
+);
 
-function FamilyTreeFlow({ layoutMode }: { layoutMode: LayoutMode }) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
-  const { fitView } = useReactFlow();
-
-  useEffect(() => {
-    const positions = layoutPositions[layoutMode];
-    setNodes((current) =>
-      current.map((node) => ({
-        ...node,
-        position: positions[node.id] ?? node.position,
-      })),
-    );
-    requestAnimationFrame(() => {
-      fitView({ padding: layoutMode === 'spatial' ? 0.25 : 0.35, duration: 400 });
-    });
-  }, [layoutMode, setNodes, fitView]);
-
-  return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      nodeTypes={nodeTypes}
-      colorMode="dark"
-      fitView
-      fitViewOptions={{ padding: layoutMode === 'spatial' ? 0.25 : 0.35 }}
-      minZoom={0.35}
-      maxZoom={1.8}
-      nodesDraggable
-      nodesConnectable={false}
-      elementsSelectable
-      proOptions={{ hideAttribution: true }}
-    >
-      <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#2e3038" />
-      <Controls showInteractive={false} />
-      <MiniMap
-        nodeColor={(node) =>
-          node.type === 'connector' ? '#f472b6' : '#43455f'
-        }
-        maskColor="rgb(0 0 0 / 70%)"
-      />
-    </ReactFlow>
-  );
-}
-
-export default function App() {
+function AppShell() {
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('web');
 
   const onLayoutChange = useCallback(
@@ -93,23 +42,30 @@ export default function App() {
     [],
   );
 
+  const flowKey = layoutMode === 'web' ? 'web' : 'strict';
+
   return (
-    <ThemeProvider theme={saasableTheme} defaultMode="dark">
-      <CssBaseline />
-      <Box className="app" sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <AppBar position="static" elevation={0} color="transparent">
+    <>
+      <CssBaseline enableColorScheme />
+      <Box className="app">
+        <AppBar position="static" elevation={0} sx={{ zIndex: 1200, flexShrink: 0 }}>
           <Toolbar sx={{ gap: 2, flexWrap: 'wrap', py: 1 }}>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ flex: 1, minWidth: 200 }}>
               <AccountTreeOutlinedIcon color="primary" />
               <Box>
-                <Typography variant="h6" component="h1">
+                <Typography variant="h6" component="h1" color="text.primary">
                   Family Tree
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  SaasAble UI · connector hubs · animated branches
+                  {layoutMode === 'strict'
+                    ? 'Generational rows · step edges · click for immediate family'
+                    : layoutMode === 'web'
+                      ? 'Flower layout · radial ring per family hub'
+                      : 'Drag to orbit · scroll to zoom'}
                 </Typography>
               </Box>
             </Stack>
+            <ThemeModeToggle />
             <ToggleButtonGroup
               exclusive
               size="small"
@@ -117,17 +73,67 @@ export default function App() {
               onChange={onLayoutChange}
               aria-label="Layout mode"
             >
+              <ToggleButton value="strict">Strict</ToggleButton>
               <ToggleButton value="web">Web</ToggleButton>
               <ToggleButton value="spatial">Spatial</ToggleButton>
             </ToggleButtonGroup>
+            {layoutMode === 'spatial' && (
+              <Chip size="small" label="Drag to orbit · scroll to zoom" variant="outlined" />
+            )}
           </Toolbar>
         </AppBar>
-        <Box className="flow-panel" sx={{ flex: 1, minHeight: 0 }}>
-          <ReactFlowProvider>
-            <FamilyTreeFlow layoutMode={layoutMode} />
-          </ReactFlowProvider>
+        <Box className="flow-panel">
+          {layoutMode === 'spatial' ? (
+            <Box sx={{ width: '100%', height: '100%' }}>
+              <Suspense
+                fallback={
+                  <Box
+                    sx={{
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: 'background.default',
+                    }}
+                  >
+                    <CircularProgress size={28} />
+                  </Box>
+                }
+              >
+                <FamilyTreeSpatial />
+              </Suspense>
+            </Box>
+          ) : (
+            <Box sx={{ width: '100%', height: '100%' }}>
+              <ReactFlowProvider key={flowKey}>
+                <FamilyTreeFlow
+                  initialNodes={layoutMode === 'strict' ? strictNodes : initialNodes}
+                  initialEdges={layoutMode === 'strict' ? strictEdges : initialEdges}
+                  nodesDraggable={layoutMode === 'web'}
+                  fitPadding={layoutMode === 'strict' ? 0.08 : 0.22}
+                  focusMode="immediate"
+                  edgeType={layoutMode === 'strict' ? 'step' : 'default'}
+                  flowerLayout={layoutMode === 'web'}
+                />
+              </ReactFlowProvider>
+            </Box>
+          )}
         </Box>
       </Box>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider
+      theme={saasableTheme}
+      defaultMode="dark"
+      modeStorageKey={COLOR_MODE_STORAGE_KEY}
+    >
+      <ColorModeProvider>
+        <AppShell />
+      </ColorModeProvider>
     </ThemeProvider>
   );
 }

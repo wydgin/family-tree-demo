@@ -3,10 +3,11 @@ import { createTheme } from '@mui/material/styles';
 /**
  * SaasAble Free palette (Hosting theme) — adapted from
  * https://github.com/phoenixcoded/saasable-ui (admin/vite/src/themes/palette.js)
- * MUI Store: https://mui.com/store/items/saasable-free-multipurpose-ui-kit-dashboard/
  */
 export const saasableTheme = createTheme({
-  cssVariables: true,
+  cssVariables: {
+    colorSchemeSelector: 'data-mui-color-scheme',
+  },
   colorSchemes: {
     dark: {
       palette: {
@@ -62,14 +63,28 @@ export const saasableTheme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
-        body: { margin: 0 },
+        html: {
+          height: '100%',
+        },
+        body: {
+          margin: 0,
+          minHeight: '100%',
+        },
+        '#root': {
+          minHeight: '100%',
+        },
       },
     },
     MuiAppBar: {
+      defaultProps: {
+        color: 'default',
+      },
       styleOverrides: {
-        root: {
+        root: ({ theme }) => ({
           backgroundImage: 'none',
-        },
+          backgroundColor: theme.vars.palette.background.paper,
+          borderBottom: `1px solid ${theme.vars.palette.divider}`,
+        }),
       },
     },
     MuiToggleButton: {
