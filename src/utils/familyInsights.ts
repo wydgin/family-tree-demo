@@ -57,14 +57,16 @@ export type GenerationInsights = {
 };
 
 export type FamilyInsights = {
+  overall: GenerationInsights;
   byGeneration: GenerationInsights[];
 };
 
-function buildGenerationInsights(
-  generation: Generation,
+function buildInsightsForProfiles(
   profiles: PersonProfile[],
+  label: string,
+  generation: Generation,
 ): GenerationInsights {
-  const genProfiles = profiles.filter((p) => profileGeneration(p.id) === generation);
+  const genProfiles = profiles;
 
   const childRecords: ChildCountRecord[] = [];
   for (const profile of genProfiles) {
@@ -91,7 +93,7 @@ function buildGenerationInsights(
 
   return {
     generation,
-    label: GENERATION_LABELS[generation],
+    label,
     averageChildren: average(counts),
     highestChildren:
       childRecords.length > 0
@@ -109,8 +111,18 @@ function buildGenerationInsights(
   };
 }
 
+function buildGenerationInsights(
+  generation: Generation,
+  allProfiles: PersonProfile[],
+): GenerationInsights {
+  const profiles = allProfiles.filter((p) => profileGeneration(p.id) === generation);
+  return buildInsightsForProfiles(profiles, GENERATION_LABELS[generation], generation);
+}
+
 export function computeFamilyInsights(allProfiles: PersonProfile[]): FamilyInsights {
+  const bloodline = allProfiles.filter((p) => profileGeneration(p.id) !== null);
   return {
+    overall: buildInsightsForProfiles(bloodline, 'Overall (all generations)', 1),
     byGeneration: ([1, 2, 3] as Generation[]).map((g) => buildGenerationInsights(g, allProfiles)),
   };
 }
