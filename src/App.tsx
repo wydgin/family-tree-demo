@@ -9,6 +9,7 @@ import '@fontsource/figtree/400.css';
 import '@fontsource/figtree/500.css';
 import '@fontsource/figtree/600.css';
 
+import { TreeEditorProvider, useTreeEditor } from './auth/TreeEditorContext';
 import { AppHeader } from './components/AppHeader';
 import { ProfileSidebar } from './components/ProfileSidebar';
 import { initialEdges, initialNodes } from './data/familyTree';
@@ -35,10 +36,14 @@ const FamilyMigrationMap = lazy(() =>
 );
 
 function AppShell() {
+  const { isEditor } = useTreeEditor();
   const [appTab, setAppTab] = useState<AppTab>('tree');
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('web');
   const [nodesLocked, setNodesLocked] = useState(() => loadLockState());
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+
+  const canEditTreeLayout = isEditor;
+  const treeNodesDraggable = layoutMode === 'web' && canEditTreeLayout && !nodesLocked;
 
   const onAppTabChange = useCallback((tab: AppTab) => {
     setAppTab(tab);
@@ -101,13 +106,14 @@ function AppShell() {
                   <FamilyTreeFlow
                     initialNodes={layoutMode === 'strict' ? strictNodes : initialNodes}
                     initialEdges={layoutMode === 'strict' ? strictEdges : initialEdges}
-                    nodesDraggable={layoutMode === 'web' && !nodesLocked}
+                    nodesDraggable={treeNodesDraggable}
                     fitPadding={layoutMode === 'strict' ? 0.08 : 0.22}
                     focusMode="immediate"
                     edgeType={layoutMode === 'strict' ? 'step' : 'default'}
                     flowerLayout={layoutMode === 'web'}
                     selectedPersonId={selectedPersonId}
                     onSelectPerson={setSelectedPersonId}
+                    allowLayoutSave={canEditTreeLayout}
                   />
                 </ReactFlowProvider>
               )
@@ -156,7 +162,9 @@ export default function App() {
       modeStorageKey={COLOR_MODE_STORAGE_KEY}
     >
       <ColorModeProvider>
-        <AppShell />
+        <TreeEditorProvider>
+          <AppShell />
+        </TreeEditorProvider>
       </ColorModeProvider>
     </ThemeProvider>
   );

@@ -64,6 +64,8 @@ export type FamilyTreeFlowProps = {
   positionsStorageKey?: string;
   selectedPersonId?: string | null;
   onSelectPerson?: (personId: string | null) => void;
+  /** Show save-layout control (owner edit session only). */
+  allowLayoutSave?: boolean;
 };
 
 function withThemedBranchEdges(edges: Edge[], branchColor: string): Edge[] {
@@ -240,6 +242,7 @@ export function FamilyTreeFlow({
   positionsStorageKey = WEB_POSITIONS_KEY,
   selectedPersonId,
   onSelectPerson,
+  allowLayoutSave = false,
 }: FamilyTreeFlowProps) {
   const { mode } = useAppColorMode();
   const savedPositions = useMemo(
@@ -338,12 +341,12 @@ export function FamilyTreeFlow({
           setEdges={setEdges}
         />
       )}
-      {positionsStorageKey && nodesDraggable && (
-        <>
-          <SaveLayoutPanel storageKey={positionsStorageKey} />
-          <PersistNodePositions storageKey={positionsStorageKey} />
-        </>
-      )}
+      {positionsStorageKey && nodesDraggable && allowLayoutSave ? (
+        <SaveLayoutPanel storageKey={positionsStorageKey} />
+      ) : null}
+      {positionsStorageKey && nodesDraggable ? (
+        <PersistNodePositions storageKey={positionsStorageKey} />
+      ) : null}
       <Background
         variant={BackgroundVariant.Dots}
         gap={20}

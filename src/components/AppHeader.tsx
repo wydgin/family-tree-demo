@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
 import LockIcon from '@mui/icons-material/Lock';
@@ -6,6 +6,7 @@ import LockOpenIcon from '@mui/icons-material/LockOpen';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Toolbar from '@mui/material/Toolbar';
@@ -13,11 +14,13 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 
+import { useTreeEditor } from '../auth/TreeEditorContext';
 import type { LayoutMode } from '../layouts/positions';
 import { APP_TABS, type AppTab } from '../navigation/appTabs';
 import { useAppColorMode } from '../theme/ColorModeProvider';
 import { ThemeModeToggle } from '../theme/ThemeModeToggle';
 import { PillNavGroup } from './PillNavGroup';
+import { TreeEditorUnlockDialog } from './TreeEditorUnlockDialog';
 
 const LAYOUT_ITEMS = [
   { value: 'strict' as const, label: 'Strict' },
@@ -51,6 +54,8 @@ export function AppHeader({
   const theme = useTheme();
   const { mode } = useAppColorMode();
   const isDark = mode === 'dark';
+  const { isEditor, canUnlock, endSession } = useTreeEditor();
+  const [unlockOpen, setUnlockOpen] = useState(false);
 
   const dotColor = alpha(
     isDark ? theme.palette.common.white : theme.palette.common.black,
@@ -174,28 +179,44 @@ export function AppHeader({
               items={LAYOUT_ITEMS}
               onChange={onLayoutChange}
             />
-            {layoutMode === 'web' && (
-              <Tooltip title={nodesLocked ? 'Unlock nodes (allow drag)' : 'Lock nodes'}>
-                <IconButton
-                  size="small"
-                  color={nodesLocked ? 'primary' : 'inherit'}
-                  onClick={onToggleLock}
-                  aria-label={nodesLocked ? 'Unlock nodes' : 'Lock nodes'}
-                  aria-pressed={nodesLocked}
-                  sx={{
-                    borderRadius: 2,
-                    border: `1px solid ${theme.palette.divider}`,
-                    bgcolor: 'grey.200',
-                    color: 'text.primary',
-                  }}
-                >
-                  {nodesLocked ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
-                </IconButton>
-              </Tooltip>
-            )}
+            {layoutMode === 'web' && isEditor ? (
+              <>
+                <Tooltip title={nodesLocked ? 'Unlock nodes (allow drag)' : 'Lock nodes'}>
+                  <IconButton
+                    size="small"
+                    color={nodesLocked ? 'primary' : 'inherit'}
+                    onClick={onToggleLock}
+                    aria-label={nodesLocked ? 'Unlock nodes' : 'Lock nodes'}
+                    aria-pressed={nodesLocked}
+                    sx={{
+                      borderRadius: 2,
+                      border: `1px solid ${theme.palette.divider}`,
+                      bgcolor: 'grey.200',
+                      color: 'text.primary',
+                    }}
+                  >
+                    {nodesLocked ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
+                  </IconButton>
+                </Tooltip>
+                <Button size="small" variant="text" onClick={endSession} sx={{ textTransform: 'none' }}>
+                  End edit session
+                </Button>
+              </>
+            ) : null}
+            {layoutMode === 'web' && canUnlock && !isEditor ? (
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => setUnlockOpen(true)}
+                sx={{ textTransform: 'none' }}
+              >
+                Edit layout
+              </Button>
+            ) : null}
           </>
         ) : null}
       </Box>
+      <TreeEditorUnlockDialog open={unlockOpen} onClose={() => setUnlockOpen(false)} />
     </AppBar>
   );
 }
