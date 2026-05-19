@@ -16,9 +16,11 @@ import { strictEdges, strictNodes } from './data/strictFamilyTree';
 import { FamilyTreeFlow } from './flow/FamilyTreeFlow';
 import { loadLockState, saveLockState } from './flow/nodePositionStorage';
 import type { LayoutMode } from './layouts/positions';
+import type { AppTab } from './navigation/appTabs';
 import { COLOR_MODE_STORAGE_KEY } from './theme/applyThemeTokens';
 import { ColorModeProvider } from './theme/ColorModeProvider';
 import { saasableTheme } from './theme/saasableTheme';
+import { InsightsView } from './views/InsightsView';
 
 const FamilyTreeSpatial = lazy(() =>
   import('./spatial/FamilyTreeSpatial').then((m) => ({
@@ -26,10 +28,22 @@ const FamilyTreeSpatial = lazy(() =>
   })),
 );
 
+const FamilyMigrationMap = lazy(() =>
+  import('./components/FamilyMigrationMap').then((m) => ({
+    default: m.FamilyMigrationMap,
+  })),
+);
+
 function AppShell() {
+  const [appTab, setAppTab] = useState<AppTab>('tree');
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('web');
   const [nodesLocked, setNodesLocked] = useState(() => loadLockState());
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+
+  const onAppTabChange = useCallback((tab: AppTab) => {
+    setAppTab(tab);
+    if (tab !== 'tree') setSelectedPersonId(null);
+  }, []);
 
   const onLayoutChange = useCallback((value: LayoutMode) => {
     setLayoutMode(value);
@@ -45,12 +59,15 @@ function AppShell() {
   }, []);
 
   const flowKey = layoutMode === 'web' ? 'web' : 'strict';
+  const showProfileSidebar = selectedPersonId && (appTab === 'tree' || appTab === 'map');
 
   return (
     <>
       <CssBaseline enableColorScheme />
       <Box className="app">
         <AppHeader
+          appTab={appTab}
+          onAppTabChange={onAppTabChange}
           layoutMode={layoutMode}
           onLayoutChange={onLayoutChange}
           nodesLocked={nodesLocked}
@@ -58,8 +75,43 @@ function AppShell() {
         />
         <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
           <Box className="flow-panel" sx={{ flex: 1, minWidth: 0 }}>
-          {layoutMode === 'spatial' ? (
-            <Box sx={{ width: '100%', height: '100%' }}>
+            {appTab === 'tree' ? (
+              layoutMode === 'spatial' ? (
+                <Suspense
+                  fallback={
+                    <Box
+                      sx={{
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <CircularProgress size={28} />
+                    </Box>
+                  }
+                >
+                  <FamilyTreeSpatial
+                    selectedPersonId={selectedPersonId}
+                    onSelectPerson={setSelectedPersonId}
+                  />
+                </Suspense>
+              ) : (
+                <ReactFlowProvider key={flowKey}>
+                  <FamilyTreeFlow
+                    initialNodes={layoutMode === 'strict' ? strictNodes : initialNodes}
+                    initialEdges={layoutMode === 'strict' ? strictEdges : initialEdges}
+                    nodesDraggable={layoutMode === 'web' && !nodesLocked}
+                    fitPadding={layoutMode === 'strict' ? 0.08 : 0.22}
+                    focusMode="immediate"
+                    edgeType={layoutMode === 'strict' ? 'step' : 'default'}
+                    flowerLayout={layoutMode === 'web'}
+                    selectedPersonId={selectedPersonId}
+                    onSelectPerson={setSelectedPersonId}
+                  />
+                </ReactFlowProvider>
+              )
+            ) : appTab === 'map' ? (
               <Suspense
                 fallback={
                   <Box
@@ -68,38 +120,23 @@ function AppShell() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      bgcolor: 'background.default',
                     }}
                   >
                     <CircularProgress size={28} />
                   </Box>
                 }
               >
-                <FamilyTreeSpatial
-                  selectedPersonId={selectedPersonId}
-                  onSelectPerson={setSelectedPersonId}
+                <FamilyMigrationMap
+                  onSelectPerson={(id) => {
+                    setSelectedPersonId(id);
+                  }}
                 />
               </Suspense>
-            </Box>
-          ) : (
-            <Box sx={{ width: '100%', height: '100%' }}>
-              <ReactFlowProvider key={flowKey}>
-                <FamilyTreeFlow
-                  initialNodes={layoutMode === 'strict' ? strictNodes : initialNodes}
-                  initialEdges={layoutMode === 'strict' ? strictEdges : initialEdges}
-                  nodesDraggable={layoutMode === 'web' && !nodesLocked}
-                  fitPadding={layoutMode === 'strict' ? 0.08 : 0.22}
-                  focusMode="immediate"
-                  edgeType={layoutMode === 'strict' ? 'step' : 'default'}
-                  flowerLayout={layoutMode === 'web'}
-                  selectedPersonId={selectedPersonId}
-                  onSelectPerson={setSelectedPersonId}
-                />
-              </ReactFlowProvider>
-            </Box>
-          )}
+            ) : (
+              <InsightsView />
+            )}
           </Box>
-          {selectedPersonId ? (
+          {showProfileSidebar ? (
             <ProfileSidebar
               personId={selectedPersonId}
               onClose={() => setSelectedPersonId(null)}

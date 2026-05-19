@@ -190,6 +190,10 @@ export function getProfile(personId: string): PersonProfile | undefined {
   return profiles.get(personId);
 }
 
+export function getAllProfiles(): PersonProfile[] {
+  return [...profiles.values()];
+}
+
 export function formatNodeLabel(profile: PersonProfile): string {
   const line1 = profile.deceased
     ? `${profile.name}, ${profile.age} (†)`
