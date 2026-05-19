@@ -89,8 +89,9 @@ html[data-mui-color-scheme='dark'] body {
 
 /* Person nodes */
 .person-node {
-  min-width: 7.5rem;
-  padding: 0.55rem 0.9rem;
+  min-width: 6.75rem;
+  max-width: 11rem;
+  padding: 0.5rem 0.75rem;
   border-radius: 10px;
   border-width: 1.5px;
   border-style: solid;
@@ -145,10 +146,11 @@ html[data-mui-color-scheme='dark'] body {
 }
 
 .person-node__label {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 500;
+  line-height: 1.35;
   color: var(--person-text);
-  white-space: nowrap;
+  white-space: pre-line;
   pointer-events: none;
 }
 
@@ -164,13 +166,13 @@ html[data-mui-color-scheme='dark'] body {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 4px solid var(--branch-stroke, #e8a0a0);
+  border: 4px solid var(--branch-stroke, #e6cf6a);
   background: transparent;
-  box-shadow: 0 0 12px color-mix(in srgb, var(--branch-stroke, #e8a0a0) 30%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--branch-stroke, #e6cf6a) 30%, transparent);
 }
 
 html[data-mui-color-scheme='dark'] .connector-node__ring {
-  box-shadow: 0 0 16px color-mix(in srgb, var(--branch-stroke, #f28b8b) 48%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--branch-stroke, #f0dc78) 48%, transparent);
 }
 
 .connector-node--branch .connector-node__ring {

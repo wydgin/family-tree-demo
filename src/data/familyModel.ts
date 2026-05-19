@@ -19,7 +19,8 @@ export type CousinGroup = {
 
 /** Spouse lives on the couple hub only — never on the grandparents’ sibling ring. */
 export type MarriedChild = {
-  hubId: string;
+  /** Omitted when the person only has an ex (no current spouse / couple hub). */
+  hubId?: string;
   sibling: PersonDef;
   spouse?: PersonDef;
   exSpouse?: PersonDef;
@@ -105,7 +106,6 @@ export const maternalGrandparents: GrandparentUnit = {
           spouse: p('cousin-1-husband', 'Cousin 1 Husband', 'male'),
         },
         {
-          hubId: 'hub-cousin-2',
           sibling: p('cousin-2', 'Cousin 2', 'female'),
           exSpouse: p('cousin-2-ex-husband', 'Cousin 2 Ex-Husband', 'male'),
         },
@@ -250,11 +250,11 @@ export const paternalGrandparentsA: GrandparentUnit = {
       spouse: p('tiyong-1-wife', 'Tiyong 1 Wife', 'female'),
       children: cousins(c(24), c(25), c(26), c(27), c(28)),
       marriedChildren: [
-        marriedCousin(24, 'wife'),
-        marriedCousin(25, 'husband'),
+        marriedCousin(24, 'husband'),
+        marriedCousin(25, 'wife'),
         marriedCousin(26, 'husband'),
         marriedCousin(27, 'wife'),
-        marriedCousin(28, 'husband'),
+        marriedCousin(28, 'wife'),
       ],
     },
     {
@@ -265,11 +265,11 @@ export const paternalGrandparentsA: GrandparentUnit = {
       marriedChildren: [
         marriedCousin(29, 'husband'),
         marriedCousin(30, 'wife'),
-        marriedCousin(31, 'wife'),
-        marriedCousin(32, 'husband'),
-        marriedCousin(33, 'husband'),
+        marriedCousin(31, 'husband'),
+        marriedCousin(32, 'wife'),
+        marriedCousin(33, 'wife'),
         marriedCousin(34, 'wife'),
-        marriedCousin(35, 'husband'),
+        marriedCousin(35, 'wife'),
       ],
     },
     {
@@ -327,7 +327,7 @@ export const myFamily: NuclearFamily = {
   hubId: 'hub-parents',
   parents: [p('mother', 'Mother', 'female'), p('father', 'Father', 'male')],
   children: [
-    p('me', 'Me', 'male'),
+    p('me', 'Me', 'female'),
     p('brother-1', 'Brother 1', 'male'),
     p('brother-2', 'Brother 2', 'male'),
   ],

@@ -3,7 +3,7 @@ import type { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 
 import { loadSavedPositions, mergeSavedPositions } from '../flow/nodePositionStorage';
 import { wireFloatingEdges } from './edgeHandles';
-import { layoutFlowerTree } from './flowerLayout';
+import { applyTiyong1RightBranch, layoutFlowerTree } from './flowerLayout';
 
 export function useFlowerLayout(
   initialNodes: Node[],
@@ -31,7 +31,7 @@ export function useFlowerLayout(
           ? loadSavedPositions(positionsStorageKey)
           : null;
         const merged = mergeSavedPositions(laid, saved);
-        setNodes(merged);
+        setNodes(applyTiyong1RightBranch(merged, initialEdges, saved));
         setEdges(wireFloatingEdges(initialEdges));
         setReady(true);
         setRevision((r) => r + 1);

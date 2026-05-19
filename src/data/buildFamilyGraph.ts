@@ -10,6 +10,7 @@ import {
   paternalGrandparentsA,
   paternalGrandparentsB,
 } from './familyModel';
+import { formatNodeLabel, getProfile, syncProfiles } from './familyProfiles';
 import type { GraphEdge, GraphNode } from './graphTypes';
 import type { PersonGender } from './graphTypes';
 
@@ -29,7 +30,7 @@ function addBranchEdge(source: string, target: string, edgeId?: string) {
     id: edgeId ?? `${source}-to-${target}`,
     source,
     target,
-    animated: true,
+    animated: false,
     data: { kind: 'branch' },
     style: branchEdgeStyle,
   });
@@ -40,7 +41,7 @@ function addGreyEdge(source: string, target: string, edgeId?: string) {
     id: edgeId ?? `${source}-to-${target}-child`,
     source,
     target,
-    animated: true,
+    animated: false,
     data: { kind: 'grey' },
     style: greyEdgeStyle,
   });
@@ -51,7 +52,7 @@ function addFaintEdge(source: string, target: string) {
     id: `${source}-${target}-faint`,
     source,
     target,
-    animated: true,
+    animated: false,
     data: { kind: 'faint' },
     style: faintEdgeStyle,
   });
@@ -62,8 +63,18 @@ function addMarriedChild(
   mc: MarriedChild,
   layout: 'both-in' | 'hub-spouse-out' = 'both-in',
 ) {
-  hubIds.add(mc.hubId);
   registerPerson(mc.sibling);
+
+  /** Ex only — faint link to sibling, no couple hub (avoids orphan branch edge). */
+  if (!mc.spouse && mc.exSpouse) {
+    registerPerson(mc.exSpouse);
+    addFaintEdge(mc.exSpouse.id, mc.sibling.id);
+    return;
+  }
+
+  if (!mc.hubId) return;
+
+  hubIds.add(mc.hubId);
 
   if (mc.spouse) {
     registerPerson(mc.spouse);
@@ -153,11 +164,17 @@ function buildFlowNodes(): FlowNode[] {
   const nodes: FlowNode[] = [];
 
   for (const person of personById.values()) {
+    const profile = getProfile(person.id);
+    const gender: PersonGender =
+      profile?.sex === 'M' ? 'male' : profile?.sex === 'F' ? 'female' : person.gender;
     nodes.push({
       id: person.id,
       type: 'person',
       position: { x: 0, y: 0 },
-      data: { label: person.label, gender: person.gender },
+      data: {
+        label: profile ? formatNodeLabel(profile) : person.label,
+        gender,
+      },
     });
   }
 
@@ -192,6 +209,7 @@ function dedupeEdges(list: FlowEdge[]): FlowEdge[] {
 
 export function buildGraphData() {
   buildEdges();
+  syncProfiles(personById.values(), edges);
   return {
     rawNodes: buildFlowNodes(),
     rawEdges: dedupeEdges(edges),

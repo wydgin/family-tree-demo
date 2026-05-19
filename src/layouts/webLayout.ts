@@ -4,7 +4,7 @@ type Pos = { x: number; y: number };
 type Center = { cx: number; cy: number };
 
 const PERSON_W = 148;
-const PERSON_H = 46;
+const PERSON_H = 58;
 const CONNECTOR = 28;
 const NODE_PAD = 40;
 

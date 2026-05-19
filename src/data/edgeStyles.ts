@@ -1,5 +1,5 @@
-/** Pastel red — spouse / parent branch connections (also in flowTheme.branchStroke) */
-export const branchStroke = '#e8a0a0';
+/** Pastel yellow — spouse / parent branch connections (also in flowTheme.branchStroke) */
+export const branchStroke = '#e6cf6a';
 
 export const branchEdgeStyle = {
   stroke: branchStroke,

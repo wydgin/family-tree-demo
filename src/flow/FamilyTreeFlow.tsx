@@ -60,6 +60,8 @@ export type FamilyTreeFlowProps = {
   flowerLayout?: boolean;
   /** localStorage key for remembering dragged node positions */
   positionsStorageKey?: string;
+  selectedPersonId?: string | null;
+  onSelectPerson?: (personId: string | null) => void;
 };
 
 function withThemedBranchEdges(edges: Edge[], branchColor: string): Edge[] {
@@ -84,7 +86,7 @@ function applyFocusState(
       })),
       edges: edges.map((e) => ({
         ...e,
-        animated: e.animated ?? true,
+        animated: false,
         style: { ...e.style, opacity: 1 },
       })),
     };
@@ -114,7 +116,7 @@ function applyFocusState(
     if (active) {
       return {
         ...e,
-        animated: true,
+        animated: false,
         style: { ...base, ...focusEdgeStyle },
       };
     }
@@ -204,6 +206,8 @@ export function FamilyTreeFlow({
   edgeType = 'default',
   flowerLayout = false,
   positionsStorageKey = WEB_POSITIONS_KEY,
+  selectedPersonId,
+  onSelectPerson,
 }: FamilyTreeFlowProps) {
   const { mode } = useAppColorMode();
   const savedPositions = useMemo(
@@ -214,7 +218,9 @@ export function FamilyTreeFlow({
     mergeSavedPositions(initialNodes, savedPositions),
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [internalSelectedId, setInternalSelectedId] = useState<string | null>(null);
+  const selectedId = selectedPersonId !== undefined ? selectedPersonId : internalSelectedId;
+  const setSelectedId = onSelectPerson ?? setInternalSelectedId;
   const saveTimer = useRef<number | null>(null);
   const tokens = flowTheme[mode];
 
@@ -255,10 +261,13 @@ export function FamilyTreeFlow({
     [nodes, themedEdges, selectedId, tokens.branchStroke, focusMode],
   );
 
-  const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
-    if (node.type === 'connector') return;
-    setSelectedId((prev) => (prev === node.id ? null : node.id));
-  }, []);
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      if (node.type === 'connector') return;
+      setSelectedId(selectedId === node.id ? null : node.id);
+    },
+    [selectedId, setSelectedId],
+  );
 
   const onPaneClick = useCallback(() => {
     setSelectedId(null);

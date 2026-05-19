@@ -26,23 +26,28 @@ function drawPersonSprite(
   node: SpatialNode,
   mode: 'light' | 'dark',
 ): THREE.Sprite {
-  const key = `${mode}-${node.id}-${node.gender ?? 'x'}-${node.highlighted}`;
+  const key = `${mode}-${node.id}-${node.label}-${node.highlighted}`;
   const cached = spriteCache.get(key);
   if (cached) return cached;
 
   const t = flowTheme[mode];
-  const size = 128;
+  const width = 280;
+  const height = 120;
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext('2d')!;
 
-  const cx = size / 2;
-  const cy = size / 2;
-  const radius = size * 0.38;
+  const padX = 14;
+  const padY = 12;
+  const radius = 14;
+  const boxW = width - padX * 2;
+  const boxH = height - padY * 2;
+  const x = padX;
+  const y = padY;
 
   ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.roundRect(x, y, boxW, boxH, radius);
   ctx.fillStyle = node.highlighted ? t.spatialPersonHighlightFill : t.spatialPersonFill;
   ctx.fill();
   ctx.strokeStyle = node.highlighted
@@ -55,14 +60,16 @@ function drawPersonSprite(
   ctx.lineWidth = node.highlighted ? 3 : 2.5;
   ctx.stroke();
 
-  const icon = radius * 0.42;
-  ctx.strokeStyle = t.spatialIconStroke;
-  ctx.lineWidth = 2.5;
-  ctx.strokeRect(cx - icon, cy - icon, icon * 2, icon * 2);
-  ctx.beginPath();
-  ctx.moveTo(cx - icon, cy + icon);
-  ctx.lineTo(cx + icon, cy - icon);
-  ctx.stroke();
+  const lines = (node.label || node.id).split('\n');
+  const lineHeight = 22;
+  const startY = y + boxH / 2 - ((lines.length - 1) * lineHeight) / 2 + 6;
+  ctx.fillStyle = t.spatialIconStroke;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '600 18px Figtree, system-ui, sans-serif';
+  lines.forEach((line, i) => {
+    ctx.fillText(line, width / 2, startY + i * lineHeight);
+  });
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -72,8 +79,8 @@ function drawPersonSprite(
     depthWrite: false,
   });
   const sprite = new THREE.Sprite(material);
-  const scale = 5 + Math.sqrt(node.val) * 1.1;
-  sprite.scale.set(scale, scale, 1);
+  const scale = 7.5 + Math.sqrt(node.val) * 1.1;
+  sprite.scale.set(scale * (width / height), scale, 1);
 
   spriteCache.set(key, sprite);
   return sprite;
@@ -92,7 +99,15 @@ function drawConnectorMesh(node: SpatialNode, branchColor: string): THREE.Mesh {
   return mesh;
 }
 
-export function FamilyTreeSpatial() {
+export type FamilyTreeSpatialProps = {
+  selectedPersonId?: string | null;
+  onSelectPerson?: (personId: string | null) => void;
+};
+
+export function FamilyTreeSpatial({
+  selectedPersonId,
+  onSelectPerson,
+}: FamilyTreeSpatialProps) {
   const { mode } = useAppColorMode();
   const graphRef = useRef<
     ForceGraphMethods<SpatialNode, SpatialLink> | undefined
@@ -103,15 +118,28 @@ export function FamilyTreeSpatial() {
 
   useEffect(() => {
     clearSpatialSpriteCache();
-  }, [mode]);
+  }, [mode, selectedPersonId]);
 
   const nodeThreeObject = useCallback(
     (node: SpatialNode) => {
       if (node.kind === 'connector') return drawConnectorMesh(node, tokens.branchStroke);
-      return drawPersonSprite(node, mode);
+      const highlighted = node.id === selectedPersonId;
+      return drawPersonSprite({ ...node, highlighted }, mode);
     },
-    [mode, tokens.branchStroke],
+    [mode, selectedPersonId, tokens.branchStroke],
   );
+
+  const onNodeClick = useCallback(
+    (node: SpatialNode) => {
+      if (node.kind !== 'person' || !onSelectPerson) return;
+      onSelectPerson(selectedPersonId === node.id ? null : node.id);
+    },
+    [onSelectPerson, selectedPersonId],
+  );
+
+  const onBackgroundClick = useCallback(() => {
+    onSelectPerson?.(null);
+  }, [onSelectPerson]);
 
   return (
     <ForceGraph3D
@@ -123,7 +151,7 @@ export function FamilyTreeSpatial() {
       enableNodeDrag={false}
       enableNavigationControls
       controlType="orbit"
-      nodeLabel={(node) => node.label || ' '}
+      nodeLabel={(node) => (node.label || ' ').replace(/\n/g, ' · ')}
       linkColor={(link) =>
         link.faint ? tokens.linkFaint : link.branch ? tokens.branchStroke : tokens.linkDefault
       }
@@ -136,6 +164,8 @@ export function FamilyTreeSpatial() {
       onEngineStop={() => graphRef.current?.zoomToFit(400, 28)}
       nodeThreeObject={nodeThreeObject}
       nodeThreeObjectExtend={false}
+      onNodeClick={onNodeClick}
+      onBackgroundClick={onBackgroundClick}
     />
   );
 }

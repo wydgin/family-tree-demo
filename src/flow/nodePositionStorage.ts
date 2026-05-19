@@ -1,7 +1,7 @@
 import type { Node } from '@xyflow/react';
 
 /** Bump when auto-layout changes so stale drag positions are not reapplied. */
-export const WEB_LAYOUT_VERSION = 12;
+export const WEB_LAYOUT_VERSION = 15;
 export const WEB_POSITIONS_KEY = 'family-tree-web-positions';
 export const WEB_LOCK_KEY = 'family-tree-web-locked';
 

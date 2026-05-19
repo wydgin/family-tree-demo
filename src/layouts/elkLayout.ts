@@ -4,7 +4,7 @@ import type { Edge, Node } from '@xyflow/react';
 const elk = new ELK();
 
 export const PERSON_W = 148;
-export const PERSON_H = 46;
+export const PERSON_H = 58;
 export const CONNECTOR_SIZE = 28;
 
 export type ElkLayoutPreset = 'radial' | 'force' | 'layered-down' | 'layered-right';

@@ -6,21 +6,20 @@ type Pos = { x: number; y: number };
 type Center = { cx: number; cy: number };
 
 const PERSON_W = 148;
-const PERSON_H = 46;
+const PERSON_H = 58;
 const CONNECTOR = 28;
 
 const RING_PAD = 52;
 const SPOKE_GAP = 145;
 const COUPLE_BRANCH_OUT = 280;
-const COUPLE_BRANCH_OUT_PATERNAL = 320;
-const COUSIN_COUPLE_BRANCH_OUT = 240;
-const PATERNAL_SPOKE_EXTRA = 120;
+const COUPLE_BRANCH_OUT_PATERNAL = 380;
+const PATERNAL_SPOKE_EXTRA = 140;
 
 /** Same angular spread as webLayout — mirrors maternal ring on the right. */
 const PATERNAL_A_ANGLE: Record<string, number> = {
   'grandmother-2': -Math.PI / 2 - 0.22,
   'grandfather-2': -Math.PI / 2 + 0.22,
-  'tiyong-1': Math.PI * 1.05,
+  'tiyong-1': 0.06,
   'tiyong-2': Math.PI * 0.68,
   'tiyong-3': Math.PI * 0.54,
   'tiyang-1': Math.PI * 0.4,
@@ -28,9 +27,12 @@ const PATERNAL_A_ANGLE: Record<string, number> = {
   'tiyang-3': Math.PI * 0.12,
 };
 const SPOUSE_ALONG_SPOKE = 130;
-const COUSIN_ALONG_SPOKE = 150;
-const COUSIN_PAD = 32;
-const COUSIN_ROW_GAP = 58;
+const COUSIN_ALONG_SPOKE = 175;
+const COUSIN_PAD = 44;
+const COUSIN_ROW_GAP = 78;
+const COUSIN_MARRIAGE_BRANCH = 100;
+const COUSIN_MARRIAGE_SPOUSE = 120;
+const COUSIN_MARRIAGE_SPOKE_BIAS = 0.09;
 const COUPLE_BRANCH_CLOSE = 115;
 const EX_NEAR_SIBLING = 105;
 
@@ -89,6 +91,14 @@ function isCoupleHub(hubId: string) {
     !hubId.startsWith('hub-gp-') &&
     hubId !== 'hub-parents'
   );
+}
+
+function isCousinMarriageHub(hubId: string) {
+  return hubId.startsWith('hub-cousin-');
+}
+
+function cousinArcBaseDist(cousinCount: number) {
+  return SPOUSE_ALONG_SPOKE + COUSIN_ALONG_SPOKE + Math.max(0, cousinCount - 4) * 28;
 }
 
 function ringRadius(count: number) {
@@ -155,6 +165,28 @@ function faintExId(siblingId: string, edges: Edge[]) {
   return ex?.source;
 }
 
+function placeExPartnerNearSibling(
+  map: PositionMap,
+  graph: GraphMaps,
+  siblingId: string,
+  edges: Edge[],
+  mode: CoupleMode,
+  spoke: number,
+) {
+  const exId = faintExId(siblingId, edges);
+  if (!exId || !graph.nodeById.has(exId) || !map.has(siblingId)) return;
+
+  const sib = graph.nodeById.get(siblingId)!;
+  const { cx: scx, cy: scy } = map.centerOf(siblingId, sib);
+  const exAngle = spoke + (mode === 'outward' ? 0.52 : 0.42);
+  const exP = polar(scx, scy, EX_NEAR_SIBLING, exAngle);
+  map.setCenter(exId, exP.x, exP.y, graph.nodeById.get(exId)!);
+}
+
+function cousinHasCoupleHub(cousinId: string, graph: GraphMaps) {
+  return (graph.personToHub.get(cousinId) ?? []).some((id) => isCoupleHub(id));
+}
+
 function cousinsOfCoupleHub(hubId: string, graph: GraphMaps, edges: Edge[]) {
   const siblingId = siblingForCoupleHub(hubId, graph);
   const ids: string[] = [];
@@ -197,11 +229,11 @@ function layoutCousinsOnArc(
   const n = cousinIds.length;
   if (n === 0) return;
 
-  const baseDist = SPOUSE_ALONG_SPOKE + COUSIN_ALONG_SPOKE;
+  const baseDist = cousinArcBaseDist(n);
 
   const placeRow = (ids: string[], dist: number, rowIndex: number, rowCount: number) => {
     const step = cousinAngleStep(ids.length, dist);
-    const rowBias = rowCount > 1 ? (rowIndex - (rowCount - 1) / 2) * step * 0.35 : 0;
+    const rowBias = rowCount > 1 ? (rowIndex - (rowCount - 1) / 2) * step * 0.4 : 0;
     ids.forEach((cousinId, i) => {
       const spread = ids.length > 1 ? (i - (ids.length - 1) / 2) * step : 0;
       const p = polar(hubCx, hubCy, dist, spoke + spread + rowBias);
@@ -209,19 +241,50 @@ function layoutCousinsOnArc(
     });
   };
 
-  if (n <= 3) {
+  if (n <= 2) {
     placeRow(cousinIds, baseDist, 0, 1);
     return;
   }
 
-  const row1Count = Math.ceil(n / 2);
-  placeRow(cousinIds.slice(0, row1Count), baseDist, 0, 2);
-  placeRow(
-    cousinIds.slice(row1Count),
-    baseDist + PERSON_H + COUSIN_ROW_GAP,
-    1,
-    2,
-  );
+  if (n <= 4) {
+    const row1Count = Math.ceil(n / 2);
+    placeRow(cousinIds.slice(0, row1Count), baseDist, 0, 2);
+    placeRow(
+      cousinIds.slice(row1Count),
+      baseDist + PERSON_H + COUSIN_ROW_GAP,
+      1,
+      2,
+    );
+    return;
+  }
+
+  if (n <= 6) {
+    const row1Count = Math.ceil(n / 2);
+    placeRow(cousinIds.slice(0, row1Count), baseDist, 0, 2);
+    placeRow(
+      cousinIds.slice(row1Count),
+      baseDist + PERSON_H + COUSIN_ROW_GAP * 1.35,
+      1,
+      2,
+    );
+    return;
+  }
+
+  const rowSize = Math.ceil(n / 3);
+  const rows = [
+    cousinIds.slice(0, rowSize),
+    cousinIds.slice(rowSize, rowSize * 2),
+    cousinIds.slice(rowSize * 2),
+  ].filter((row) => row.length > 0);
+
+  rows.forEach((row, rowIndex) => {
+    placeRow(
+      row,
+      baseDist + rowIndex * (PERSON_H + COUSIN_ROW_GAP),
+      rowIndex,
+      rows.length,
+    );
+  });
 }
 
 function polar(cx: number, cy: number, r: number, angle: number): Pos {
@@ -258,6 +321,161 @@ function angleForMember(
 
 type CoupleMode = 'outward' | 'close';
 
+type PositionRecord = Record<string, { x: number; y: number }>;
+
+const TIYONG1_COUSIN_NUMS = [24, 25, 26, 27, 28] as const;
+
+export function isTiyong1LineageId(id: string): boolean {
+  if (id === 'tiyong-1' || id === 'hub-tiyong-1' || id === 'tiyong-1-wife') return true;
+  for (const n of TIYONG1_COUSIN_NUMS) {
+    if (id === `cousin-${n}` || id === `hub-cousin-${n}`) return true;
+    if (id.startsWith(`cousin-${n}-`)) return true;
+  }
+  return false;
+}
+
+function seedMapFromNodes<T extends Node>(nodes: T[], map: PositionMap) {
+  for (const node of nodes) {
+    map.positions.set(node.id, { x: node.position.x, y: node.position.y });
+    if (node.type === 'connector') {
+      const w = CONNECTOR;
+      const h = CONNECTOR;
+      map.hubCenters.set(node.id, {
+        cx: node.position.x + w / 2,
+        cy: node.position.y + h / 2,
+      });
+    }
+  }
+}
+
+function rightSpokeFromTiyong(
+  tcx: number,
+  tcy: number,
+  paternalHub: Center | undefined,
+): number {
+  if (!paternalHub) return 0;
+  const fromHub = Math.atan2(tcy - paternalHub.cy, tcx - paternalHub.cx);
+  if (tcx > paternalHub.cx + 40) return -0.04;
+  return Math.max(fromHub, -0.55);
+}
+
+/** Re-layout Tiyong 1 + wife + cousins + their spouses to the right; keep saved positions. */
+export function applyTiyong1RightBranch<T extends Node>(
+  nodes: T[],
+  edges: Edge[],
+  saved: PositionRecord | null,
+): T[] {
+  const graph = buildGraphMaps(nodes, edges);
+  const map = new PositionMap();
+  seedMapFromNodes(nodes, map);
+
+  if (!map.has('tiyong-1')) return nodes;
+
+  const paternalHub = map.hubCenters.get('hub-gp-paternal-a');
+  const tiyongNode = graph.nodeById.get('tiyong-1')!;
+  const { cx: tcx, cy: tcy } = map.centerOf('tiyong-1', tiyongNode);
+  const spoke = rightSpokeFromTiyong(tcx, tcy, paternalHub);
+
+  for (const id of nodes.map((n) => n.id)) {
+    if (isTiyong1LineageId(id) && id !== 'tiyong-1' && !saved?.[id]) {
+      map.clear(id);
+    }
+  }
+
+  const parentHubId = 'hub-gp-paternal-a';
+
+  function layoutCoupleHubLocal(
+    hubId: string,
+    siblingId: string,
+    force = false,
+    spokeBias = 0,
+    spokeOverride?: number,
+  ) {
+    if (map.hubCenters.has(hubId) && !force) return;
+
+    const sib = graph.nodeById.get(siblingId);
+    const parentHub = map.hubCenters.get(parentHubId);
+    if (!sib || !parentHub || !map.has(siblingId)) return;
+
+    const { cx: scx, cy: scy } = map.centerOf(siblingId, sib);
+    const hubSpoke =
+      (spokeOverride ?? Math.atan2(scy - parentHub.cy, scx - parentHub.cx)) + spokeBias;
+    const nestedMarriage = isCousinMarriageHub(hubId);
+
+    if (nestedMarriage) {
+      if (saved?.[hubId]) return;
+      const hubPos = polar(scx, scy, COUSIN_MARRIAGE_BRANCH, hubSpoke);
+      map.setCenter(hubId, hubPos.x, hubPos.y, graph.nodeById.get(hubId)!);
+      const spouses = spousesOfCoupleHub(hubId, graph, edges);
+      const { cx: hcx, cy: hcy } = map.hubCenters.get(hubId)!;
+      const perp = hubSpoke + Math.PI / 2;
+      spouses.forEach((spouseId, i) => {
+        if (saved?.[spouseId]) return;
+        const spread = spouses.length > 1 ? (i - 0.5) * 0.34 : 0;
+        const p = polar(hcx, hcy, COUSIN_MARRIAGE_SPOUSE, perp + spread);
+        map.setCenter(spouseId, p.x, p.y, graph.nodeById.get(spouseId)!);
+      });
+      return;
+    }
+
+    if (saved?.[hubId]) {
+      const { cx: hcx, cy: hcy } = map.hubCenters.get(hubId)!;
+      const spouses = spousesOfCoupleHub(hubId, graph, edges);
+      spouses.forEach((spouseId, i) => {
+        if (saved?.[spouseId]) return;
+        const spread = spouses.length > 1 ? (i - 0.5) * 0.28 : 0;
+        const p = polar(hcx, hcy, SPOUSE_ALONG_SPOKE, hubSpoke + spread);
+        map.setCenter(spouseId, p.x, p.y, graph.nodeById.get(spouseId)!);
+      });
+      const hubCousins = cousinsOfCoupleHub(hubId, graph, edges).filter((id) => !saved?.[id]);
+      layoutCousinsOnArc(map, graph, hcx, hcy, hubSpoke, hubCousins);
+      hubCousins.forEach((cousinId, i) => {
+        layoutCouplesForCousinLocal(cousinId, i, hubCousins.length);
+      });
+      return;
+    }
+
+    const hubPos = polar(scx, scy, COUPLE_BRANCH_OUT_PATERNAL, hubSpoke);
+    map.setCenter(hubId, hubPos.x, hubPos.y, graph.nodeById.get(hubId)!);
+
+    const spouses = spousesOfCoupleHub(hubId, graph, edges);
+    const { cx: hcx, cy: hcy } = map.hubCenters.get(hubId)!;
+    spouses.forEach((spouseId, i) => {
+      if (saved?.[spouseId]) return;
+      const spread = spouses.length > 1 ? (i - 0.5) * 0.28 : 0;
+      const p = polar(hcx, hcy, SPOUSE_ALONG_SPOKE, hubSpoke + spread);
+      map.setCenter(spouseId, p.x, p.y, graph.nodeById.get(spouseId)!);
+    });
+
+    const hubCousins = cousinsOfCoupleHub(hubId, graph, edges).filter((id) => !saved?.[id]);
+    layoutCousinsOnArc(map, graph, hcx, hcy, hubSpoke, hubCousins);
+    hubCousins.forEach((cousinId, i) => {
+      layoutCouplesForCousinLocal(cousinId, i, hubCousins.length);
+    });
+  }
+
+  function layoutCouplesForCousinLocal(
+    cousinId: string,
+    index: number,
+    total: number,
+  ) {
+    const spokeBias =
+      total > 1 ? (index - (total - 1) / 2) * COUSIN_MARRIAGE_SPOKE_BIAS : 0;
+    for (const nestedHubId of graph.personToHub.get(cousinId) ?? []) {
+      if (!isCoupleHub(nestedHubId)) continue;
+      if (saved?.[nestedHubId]) continue;
+      layoutCoupleHubLocal(nestedHubId, cousinId, true, spokeBias, spoke);
+    }
+  }
+
+  layoutCoupleHubLocal('hub-tiyong-1', 'tiyong-1', true, 0, spoke);
+
+  return nodes.map((node) => {
+    const pos = map.positions.get(node.id);
+    return pos ? { ...node, position: { ...pos } } : node;
+  });
+}
+
 export async function layoutFlowerTree<T extends Node>(
   nodes: T[],
   edges: Edge[],
@@ -273,6 +491,7 @@ export async function layoutFlowerTree<T extends Node>(
     mode: CoupleMode,
     force = false,
     branchOutDist = COUPLE_BRANCH_OUT,
+    spokeBias = 0,
   ) {
     if (map.hubCenters.has(hubId) && !force) return;
 
@@ -281,7 +500,32 @@ export async function layoutFlowerTree<T extends Node>(
     if (!sib || !parentHub || !map.has(siblingId)) return;
 
     const { cx: scx, cy: scy } = map.centerOf(siblingId, sib);
-    const spoke = Math.atan2(scy - parentHub.cy, scx - parentHub.cx);
+    const spoke = Math.atan2(scy - parentHub.cy, scx - parentHub.cx) + spokeBias;
+    const nestedMarriage = isCousinMarriageHub(hubId);
+
+    if (nestedMarriage) {
+      const hubPos = polar(scx, scy, COUSIN_MARRIAGE_BRANCH, spoke);
+      map.setCenter(hubId, hubPos.x, hubPos.y, graph.nodeById.get(hubId)!);
+
+      const spouses = spousesOfCoupleHub(hubId, graph, edges);
+      const { cx: hcx, cy: hcy } = map.hubCenters.get(hubId)!;
+      const perp = spoke + Math.PI / 2;
+
+      spouses.forEach((spouseId, i) => {
+        const spread = spouses.length > 1 ? (i - 0.5) * 0.34 : 0;
+        const p = polar(hcx, hcy, COUSIN_MARRIAGE_SPOUSE, perp + spread);
+        map.setCenter(spouseId, p.x, p.y, graph.nodeById.get(spouseId)!);
+      });
+
+      const exId = faintExId(siblingId, edges);
+      if (exId && graph.nodeById.has(exId)) {
+        const exAngle = perp + (mode === 'outward' ? 0.48 : 0.38);
+        const exP = polar(scx, scy, EX_NEAR_SIBLING + 12, exAngle);
+        map.setCenter(exId, exP.x, exP.y, graph.nodeById.get(exId)!);
+      }
+      return;
+    }
+
     const branchDist = mode === 'outward' ? branchOutDist : COUPLE_BRANCH_CLOSE;
     const hubPos = polar(scx, scy, branchDist, spoke);
 
@@ -306,15 +550,19 @@ export async function layoutFlowerTree<T extends Node>(
       const exSpoke = Math.atan2(exCy - scy, exCx - scx);
       const exCousins = cousinsOfPerson(exId, graph, edges);
       layoutCousinsOnArc(map, graph, exCx, exCy, exSpoke, exCousins);
-      for (const cousinId of exCousins) {
-        layoutCouplesForCousin(hubId, cousinId, mode);
+      for (let i = 0; i < exCousins.length; i++) {
+        layoutCouplesForCousin(hubId, exCousins[i], mode, i, exCousins.length);
       }
     }
 
     const hubCousins = cousinsOfCoupleHub(hubId, graph, edges);
     layoutCousinsOnArc(map, graph, hcx, hcy, spoke, hubCousins);
-    for (const cousinId of hubCousins) {
-      layoutCouplesForCousin(hubId, cousinId, mode);
+    for (let i = 0; i < hubCousins.length; i++) {
+      const cousinId = hubCousins[i];
+      layoutCouplesForCousin(hubId, cousinId, mode, i, hubCousins.length);
+      if (!cousinHasCoupleHub(cousinId, graph)) {
+        placeExPartnerNearSibling(map, graph, cousinId, edges, mode, spoke);
+      }
     }
   }
 
@@ -322,7 +570,11 @@ export async function layoutFlowerTree<T extends Node>(
     parentHubId: string,
     cousinId: string,
     mode: CoupleMode,
+    index = 0,
+    total = 1,
   ) {
+    const spokeBias =
+      total > 1 ? (index - (total - 1) / 2) * COUSIN_MARRIAGE_SPOKE_BIAS : 0;
     for (const nestedHubId of graph.personToHub.get(cousinId) ?? []) {
       if (!isCoupleHub(nestedHubId)) continue;
       layoutCoupleHub(
@@ -331,7 +583,8 @@ export async function layoutFlowerTree<T extends Node>(
         parentHubId,
         mode,
         false,
-        COUSIN_COUPLE_BRANCH_OUT,
+        COUPLE_BRANCH_OUT,
+        spokeBias,
       );
     }
   }
@@ -431,6 +684,7 @@ export async function layoutFlowerTree<T extends Node>(
   function relayoutPaternalCouples() {
     for (const id of hubMembers('hub-gp-paternal-a', graph)) {
       if (isConnector(id, graph.nodeById)) continue;
+      if (id === 'tiyong-1') continue;
       layoutCouplesForSibling('hub-gp-paternal-a', id, 'outward');
     }
   }

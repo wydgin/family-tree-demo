@@ -48,8 +48,12 @@ function isCoupleHub(hubId: string) {
   return hubId.startsWith('hub-') && !isGpHub(hubId) && hubId !== PARENTS_HUB;
 }
 
-/** Married-in relatives (spouse / ex) — never on the orange path. */
-function isSpouse(personId: string, edges: Edge[], isConnector: (id: string) => boolean) {
+/** Married-in relatives (spouse on couple hub) — never on the orange blood path. */
+export function isInLawSpouse(
+  personId: string,
+  edges: Edge[],
+  isConnector: (id: string) => boolean,
+) {
   for (const e of edges) {
     if (e.target !== personId || edgeKind(e) !== 'branch') continue;
     if (isConnector(e.source) && isCoupleHub(e.source)) return true;
@@ -67,10 +71,10 @@ function bloodOnFamilyHub(
 
   for (const e of edges) {
     if (e.target === hubId && edgeKind(e) === 'branch' && !isConnector(e.source)) {
-      if (!isSpouse(e.source, edges, isConnector)) people.add(e.source);
+      if (!isInLawSpouse(e.source, edges, isConnector)) people.add(e.source);
     }
     if (e.source === hubId && edgeKind(e) === 'grey' && !isConnector(e.target)) {
-      if (!isSpouse(e.target, edges, isConnector)) people.add(e.target);
+      if (!isInLawSpouse(e.target, edges, isConnector)) people.add(e.target);
     }
   }
 
@@ -107,7 +111,7 @@ function collectGpHubBlood(
 
   for (const e of edges) {
     if (e.target === hubId && edgeKind(e) === 'branch' && !isConnector(e.source)) {
-      if (isSpouse(e.source, edges, isConnector)) continue;
+      if (isInLawSpouse(e.source, edges, isConnector)) continue;
       nodeIds.add(e.source);
       edgeIds.add(e.id);
     }
@@ -115,7 +119,7 @@ function collectGpHubBlood(
 
   for (const e of edges) {
     if (e.source !== hubId || edgeKind(e) !== 'grey') continue;
-    if (isConnector(e.target) || isSpouse(e.target, edges, isConnector)) continue;
+    if (isConnector(e.target) || isInLawSpouse(e.target, edges, isConnector)) continue;
     nodeIds.add(e.target);
     edgeIds.add(e.id);
   }
@@ -132,7 +136,7 @@ function collectGpHubRingSiblingsOnly(
   nodeIds.add(hubId);
   for (const e of edges) {
     if (e.source !== hubId || edgeKind(e) !== 'grey') continue;
-    if (isConnector(e.target) || isSpouse(e.target, edges, isConnector)) continue;
+    if (isConnector(e.target) || isInLawSpouse(e.target, edges, isConnector)) continue;
     nodeIds.add(e.target);
     edgeIds.add(e.id);
   }
@@ -167,7 +171,7 @@ function collectGpHubAsGrandparent(
 
   for (const e of edges) {
     if (e.source !== hubId || edgeKind(e) !== 'grey') continue;
-    if (isConnector(e.target) || isSpouse(e.target, edges, isConnector)) continue;
+    if (isConnector(e.target) || isInLawSpouse(e.target, edges, isConnector)) continue;
     nodeIds.add(e.target);
     edgeIds.add(e.id);
   }
@@ -196,7 +200,7 @@ function collectGpHubDirectLine(
 
   for (const e of edges) {
     if (e.target === hubId && edgeKind(e) === 'branch' && !isConnector(e.source)) {
-      if (isSpouse(e.source, edges, isConnector)) continue;
+      if (isInLawSpouse(e.source, edges, isConnector)) continue;
       nodeIds.add(e.source);
       edgeIds.add(e.id);
     }
@@ -272,7 +276,7 @@ function collectPersonGreyChildren(
 ) {
   for (const e of edges) {
     if (e.source !== personId || edgeKind(e) !== 'grey') continue;
-    if (isConnector(e.target) || isSpouse(e.target, edges, isConnector)) continue;
+    if (isConnector(e.target) || isInLawSpouse(e.target, edges, isConnector)) continue;
     nodeIds.add(e.target);
     edgeIds.add(e.id);
   }
@@ -299,7 +303,7 @@ function collectCoupleHubWithChildren(
   for (const e of edges) {
     if (e.source !== hubId || edgeKind(e) !== 'grey') continue;
     if (isConnector(e.target) || e.target === siblingId) continue;
-    if (isSpouse(e.target, edges, isConnector)) continue;
+    if (isInLawSpouse(e.target, edges, isConnector)) continue;
     nodeIds.add(e.target);
     edgeIds.add(e.id);
   }
@@ -370,7 +374,7 @@ function collectThirdGenCousin(
         e.target === anchor &&
         edgeKind(e) === 'branch' &&
         !isConnector(e.source) &&
-        !isSpouse(e.source, edges, isConnector),
+        !isInLawSpouse(e.source, edges, isConnector),
     )?.source;
     const gpHub = uncleId ? gpHubForRingMember(uncleId, edges, isConnector) : null;
     if (gpHub) collectGpHubBlood(gpHub, edges, isConnector, nodeIds, edgeIds);
@@ -495,7 +499,7 @@ export function getImmediateFamily(
   const edgeIds = new Set<string>();
   const { isConnector } = buildIndex(nodes);
 
-  if (isSpouse(selectedId, edges, isConnector)) {
+  if (isInLawSpouse(selectedId, edges, isConnector)) {
     finalizeEdges(nodeIds, edgeIds, edges);
     return { nodeIds, edgeIds };
   }
@@ -577,7 +581,7 @@ export function getImmediateFamily(
               e.target === coupleHub &&
               edgeKind(e) === 'branch' &&
               !isConnector(e.source) &&
-              !isSpouse(e.source, edges, isConnector),
+              !isInLawSpouse(e.source, edges, isConnector),
           )?.source;
         } else {
           siblingId = edges.find(

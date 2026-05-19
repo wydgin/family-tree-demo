@@ -2,7 +2,7 @@ import Dagre from '@dagrejs/dagre';
 import type { Edge, Node } from '@xyflow/react';
 
 const PERSON_W = 148;
-const PERSON_H = 46;
+const PERSON_H = 58;
 const CONNECTOR = 28;
 
 /** Top-to-bottom generational layout (Dagre) for hub-and-spoke family trees. */

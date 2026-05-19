@@ -10,6 +10,7 @@ import '@fontsource/figtree/500.css';
 import '@fontsource/figtree/600.css';
 
 import { AppHeader } from './components/AppHeader';
+import { ProfileSidebar } from './components/ProfileSidebar';
 import { initialEdges, initialNodes } from './data/familyTree';
 import { strictEdges, strictNodes } from './data/strictFamilyTree';
 import { FamilyTreeFlow } from './flow/FamilyTreeFlow';
@@ -28,9 +29,11 @@ const FamilyTreeSpatial = lazy(() =>
 function AppShell() {
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('web');
   const [nodesLocked, setNodesLocked] = useState(() => loadLockState());
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
 
   const onLayoutChange = useCallback((value: LayoutMode) => {
     setLayoutMode(value);
+    setSelectedPersonId(null);
   }, []);
 
   const toggleNodesLocked = useCallback(() => {
@@ -53,7 +56,8 @@ function AppShell() {
           nodesLocked={nodesLocked}
           onToggleLock={toggleNodesLocked}
         />
-        <Box className="flow-panel">
+        <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
+          <Box className="flow-panel" sx={{ flex: 1, minWidth: 0 }}>
           {layoutMode === 'spatial' ? (
             <Box sx={{ width: '100%', height: '100%' }}>
               <Suspense
@@ -71,7 +75,10 @@ function AppShell() {
                   </Box>
                 }
               >
-                <FamilyTreeSpatial />
+                <FamilyTreeSpatial
+                  selectedPersonId={selectedPersonId}
+                  onSelectPerson={setSelectedPersonId}
+                />
               </Suspense>
             </Box>
           ) : (
@@ -85,10 +92,19 @@ function AppShell() {
                   focusMode="immediate"
                   edgeType={layoutMode === 'strict' ? 'step' : 'default'}
                   flowerLayout={layoutMode === 'web'}
+                  selectedPersonId={selectedPersonId}
+                  onSelectPerson={setSelectedPersonId}
                 />
               </ReactFlowProvider>
             </Box>
           )}
+          </Box>
+          {selectedPersonId ? (
+            <ProfileSidebar
+              personId={selectedPersonId}
+              onClose={() => setSelectedPersonId(null)}
+            />
+          ) : null}
         </Box>
       </Box>
     </>
