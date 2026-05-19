@@ -30,7 +30,7 @@ function addBranchEdge(source: string, target: string, edgeId?: string) {
     id: edgeId ?? `${source}-to-${target}`,
     source,
     target,
-    animated: false,
+    animated: true,
     data: { kind: 'branch' },
     style: branchEdgeStyle,
   });
@@ -41,7 +41,7 @@ function addGreyEdge(source: string, target: string, edgeId?: string) {
     id: edgeId ?? `${source}-to-${target}-child`,
     source,
     target,
-    animated: false,
+    animated: true,
     data: { kind: 'grey' },
     style: greyEdgeStyle,
   });
@@ -52,7 +52,7 @@ function addFaintEdge(source: string, target: string) {
     id: `${source}-${target}-faint`,
     source,
     target,
-    animated: false,
+    animated: true,
     data: { kind: 'faint' },
     style: faintEdgeStyle,
   });

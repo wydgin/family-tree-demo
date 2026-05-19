@@ -327,7 +327,7 @@ export const myFamily: NuclearFamily = {
   hubId: 'hub-parents',
   parents: [p('mother', 'Mother', 'female'), p('father', 'Father', 'male')],
   children: [
-    p('me', 'Me', 'female'),
+    p('me', 'Regina', 'female'),
     p('brother-1', 'Brother 1', 'male'),
     p('brother-2', 'Brother 2', 'male'),
   ],

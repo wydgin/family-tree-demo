@@ -88,7 +88,7 @@ function applyFocusState(
       })),
       edges: edges.map((e) => ({
         ...e,
-        animated: false,
+        animated: true,
         style: { ...e.style, opacity: 1 },
       })),
     };
@@ -118,7 +118,7 @@ function applyFocusState(
     if (active) {
       return {
         ...e,
-        animated: false,
+        animated: true,
         style: { ...base, ...focusEdgeStyle },
       };
     }
