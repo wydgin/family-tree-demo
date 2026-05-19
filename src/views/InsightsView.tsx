@@ -1,6 +1,11 @@
+import { useState } from 'react';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import CardActionArea from '@mui/material/CardActionArea';
 import CardContent from '@mui/material/CardContent';
+import Collapse from '@mui/material/Collapse';
 import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
@@ -13,12 +18,50 @@ function StatCard({
   title,
   value,
   subtitle,
+  detail,
 }: {
   title: string;
   value: string;
   subtitle?: string;
+  /** Shown when the card is expanded (e.g. sample size). */
+  detail?: string;
 }) {
   const theme = useTheme();
+  const [expanded, setExpanded] = useState(false);
+  const expandable = Boolean(detail);
+
+  const content = (
+    <CardContent sx={{ py: 2, '&:last-child': { pb: expandable && expanded ? 1 : 2 } }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+            {title}
+          </Typography>
+          <Typography variant="h5" fontWeight={600} sx={{ lineHeight: 1.2 }}>
+            {value}
+          </Typography>
+          {subtitle ? (
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.75, display: 'block' }}>
+              {subtitle}
+            </Typography>
+          ) : null}
+        </Box>
+        {expandable ? (
+          expanded ? (
+            <ExpandLessIcon fontSize="small" color="action" sx={{ mt: 0.25 }} />
+          ) : (
+            <ExpandMoreIcon fontSize="small" color="action" sx={{ mt: 0.25 }} />
+          )
+        ) : null}
+      </Box>
+      <Collapse in={expanded}>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pt: 1 }}>
+          {detail}
+        </Typography>
+      </Collapse>
+    </CardContent>
+  );
+
   return (
     <Card
       variant="outlined"
@@ -28,26 +71,24 @@ function StatCard({
         borderColor: 'divider',
       }}
     >
-      <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
-          {title}
-        </Typography>
-        <Typography variant="h5" fontWeight={600} sx={{ lineHeight: 1.2 }}>
-          {value}
-        </Typography>
-        {subtitle ? (
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.75, display: 'block' }}>
-            {subtitle}
-          </Typography>
-        ) : null}
-      </CardContent>
+      {expandable ? (
+        <CardActionArea onClick={() => setExpanded((e) => !e)} sx={{ height: '100%' }}>
+          {content}
+        </CardActionArea>
+      ) : (
+        content
+      )}
     </Card>
   );
 }
 
-function formatAvg(value: number | null, sampleSize: number): string {
-  if (value === null) return '—';
-  return `${value} (${sampleSize} recorded)`;
+function formatAvg(value: number | null): string {
+  return value === null ? '—' : String(value);
+}
+
+function sampleDetail(n: number, label: string): string | undefined {
+  if (n === 0) return undefined;
+  return `Based on ${n} ${label} with recorded data`;
 }
 
 function GenerationSection({ gen }: { gen: GenerationInsights }) {
@@ -60,14 +101,15 @@ function GenerationSection({ gen }: { gen: GenerationInsights }) {
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Average age at first marriage"
-            value={formatAvg(gen.averageAgeFirstMarriage, gen.marriageSampleSize)}
+            value={formatAvg(gen.averageAgeFirstMarriage)}
+            detail={sampleDetail(gen.marriageSampleSize, 'relatives')}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Average age at first birth"
-            value={formatAvg(gen.averageAgeFirstBirth, gen.birthSampleSize)}
-            subtitle="Females with recorded data"
+            value={formatAvg(gen.averageAgeFirstBirth)}
+            detail={sampleDetail(gen.birthSampleSize, 'females')}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -87,7 +129,8 @@ function GenerationSection({ gen }: { gen: GenerationInsights }) {
         <Grid size={{ xs: 12 }}>
           <StatCard
             title="Average number of children"
-            value={formatAvg(gen.averageChildren, gen.childrenSampleSize)}
+            value={formatAvg(gen.averageChildren)}
+            detail={sampleDetail(gen.childrenSampleSize, 'relatives')}
           />
         </Grid>
       </Grid>
@@ -111,7 +154,7 @@ export function InsightsView() {
         Insights
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 560 }}>
-        Demographic quick facts by generation, from profile and life-milestone data.
+        Demographic quick facts by generation. Tap a stat to see how many relatives it is based on.
       </Typography>
 
       <Divider sx={{ mb: 3 }} />

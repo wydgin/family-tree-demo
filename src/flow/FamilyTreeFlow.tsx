@@ -13,7 +13,9 @@ import {
   type Node,
   type NodeChange,
 } from '@xyflow/react';
+import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { dimmedEdgeStyle, focusEdgeStyle } from '../data/edgeStyles';
@@ -197,6 +199,36 @@ function PersistNodePositions({ storageKey }: { storageKey: string }) {
   return null;
 }
 
+function SaveLayoutPanel({ storageKey }: { storageKey: string }) {
+  const { getNodes } = useReactFlow();
+  const [saved, setSaved] = useState(false);
+
+  const onSave = useCallback(() => {
+    saveNodePositions(getNodes(), storageKey);
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2500);
+  }, [getNodes, storageKey]);
+
+  return (
+    <Panel position="top-left">
+      <Button
+        variant="contained"
+        size="small"
+        color={saved ? 'success' : 'primary'}
+        startIcon={<SaveOutlinedIcon />}
+        onClick={onSave}
+        sx={{
+          boxShadow: 2,
+          textTransform: 'none',
+          fontWeight: 600,
+        }}
+      >
+        {saved ? 'Layout saved' : 'Save layout'}
+      </Button>
+    </Panel>
+  );
+}
+
 export function FamilyTreeFlow({
   initialNodes,
   initialEdges,
@@ -307,7 +339,10 @@ export function FamilyTreeFlow({
         />
       )}
       {positionsStorageKey && nodesDraggable && (
-        <PersistNodePositions storageKey={positionsStorageKey} />
+        <>
+          <SaveLayoutPanel storageKey={positionsStorageKey} />
+          <PersistNodePositions storageKey={positionsStorageKey} />
+        </>
       )}
       <Background
         variant={BackgroundVariant.Dots}
